@@ -12,7 +12,7 @@ export interface ProtocolData {
   rationaleSecondary: string;
   
   // Objectives
-  measurementScales: string; // New: For defining scales (e.g. Hamilton)
+  measurementScales: string[]; // Changed to Array
   primaryObjective: string;
   secondaryObjectives: string[];
   
@@ -25,17 +25,17 @@ export interface ProtocolData {
   // Design & Interventions
   studyType: string;
   studyDesign: string;
-  designModel: 'parallel' | 'crossover' | 'single_group' | 'factorial' | 'pre_post' | ''; // Added pre_post
+  designModel: 'parallel' | 'crossover' | 'single_group' | 'factorial' | 'pre_post' | ''; 
   controlType: 'placebo' | 'active' | 'historical' | 'none' | '';
   isNested: boolean;
-  followUpDuration: string; // New: Duration of follow-up
+  followUpDuration: string; 
   interventions: string;
   
   // Evaluations
   evaluationsGeneral: string;
   evaluationsPrimary: string;
   evaluationsSecondary: string[];
-  variableDefinitions: string[]; // New: How variables are measured
+  variableDefinitions: string[]; 
   otherVariables: string[];
   
   // Statistics
@@ -77,7 +77,7 @@ export interface ProtocolData {
   proposedBy: string;
   proposalDate: string;
   bibliography: string;
-  appendices: string; // New: For scales, images (text representation), etc.
+  appendices: string; 
 }
 
 export enum SectionTab {

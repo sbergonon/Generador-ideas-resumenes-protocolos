@@ -9,7 +9,7 @@ export const INITIAL_PROTOCOL_DATA: ProtocolData = {
   phase: '',
   rationalePrimary: '',
   rationaleSecondary: '',
-  measurementScales: '',
+  measurementScales: [''], // Initialized as array
   primaryObjective: '',
   secondaryObjectives: [''],
   selectionMethod: '',
