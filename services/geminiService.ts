@@ -31,7 +31,7 @@ const ai = new GoogleGenAI({ apiKey });
 
 export const refineText = async (text: string, context: string, lang: Language): Promise<string> => {
   if (!apiKey) {
-    console.error("Gemini API Error: API Key not found. Please configure VITE_GEMINI_API_KEY in your environment.");
+    console.error("Gemini API Error: API Key not found.");
     return "Error: API Key configuration missing.";
   }
 
@@ -68,7 +68,6 @@ export const refineText = async (text: string, context: string, lang: Language):
 
 export const generateList = async (type: string, context: string, lang: Language): Promise<string[]> => {
   if (!apiKey) {
-      console.error("Gemini API Error: API Key not found. Please configure VITE_GEMINI_API_KEY in your environment.");
       return ["Error: API Key configuration missing."];
   }
 
@@ -108,7 +107,6 @@ export const generateList = async (type: string, context: string, lang: Language
 
 export const generateText = async (context: string, instruction: string, lang: Language): Promise<string> => {
   if (!apiKey) {
-      console.error("Gemini API Error: API Key not found. Please configure VITE_GEMINI_API_KEY in your environment.");
       return "Error: API Key configuration missing.";
   }
 
@@ -141,18 +139,23 @@ export const generateText = async (context: string, instruction: string, lang: L
   }
 };
 
-// New function for context with search grounding
-export const generateContextWithSearch = async (title: string, objective: string, lang: Language): Promise<string> => {
+// Interface for text + references result
+export interface GeneratedContentWithRefs {
+  text: string;
+  references: string;
+}
+
+// New function for context with search grounding AND separation of references
+export const generateContextWithSearchAndRefs = async (title: string, objective: string, lang: Language): Promise<GeneratedContentWithRefs> => {
   if (!apiKey) {
-    return "Error: API Key configuration missing.";
+    return { text: "Error: API Key missing.", references: "" };
   }
 
   try {
-    // Use gemini-2.5-flash for search grounding
     const model = 'gemini-2.5-flash'; 
     const langInstruction = lang === 'es' 
-      ? "Escribe en Español. Incluye referencias bibliográficas reales (Estilo Vancouver o similar) al final del texto." 
-      : "Write in English. Include real bibliographic references (Vancouver style or similar) at the end.";
+      ? "Escribe en Español. Usa referencias numéricas en el texto [1], [2]. Al final, añade una sección '### REFERENCES ###' con la bibliografía completa en estilo Vancouver." 
+      : "Write in English. Use numeric citations in text [1], [2]. At the end, add a section '### REFERENCES ###' with the full bibliography in Vancouver style.";
 
     const prompt = `
       You are a clinical research expert performing a literature review.
@@ -165,8 +168,9 @@ export const generateContextWithSearch = async (title: string, objective: string
       1. Explain the disease/condition background.
       2. Explain the current gap in knowledge or the need for this specific study (Rationale).
       3. Use Google Search to find relevant, real, and recent medical literature (Pubmed/Medline sources preferred).
-      4. Cite these sources in the text and list them at the bottom.
-      5. ${langInstruction}
+      4. Cite these sources in the text using numbers [1], [2]...
+      5. List the full references at the bottom after the delimiter '### REFERENCES ###'.
+      6. ${langInstruction}
     `;
 
     const response = await ai.models.generateContent({
@@ -177,29 +181,67 @@ export const generateContextWithSearch = async (title: string, objective: string
       }
     });
 
-    // We return the text directly. If grounding chunks are present, the model usually incorporates citation markers [1] in the text.
-    // The user can edit the result.
-    let text = response.text?.trim() || '';
+    let fullText = response.text?.trim() || '';
     
-    // Optional: Append grounding metadata links if not explicitly in text (though model usually handles it with the prompt above)
-    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-    if (chunks && chunks.length > 0) {
-      const links = chunks
-        .map(c => c.web?.uri ? `[${c.web.title || 'Source'}]: ${c.web.uri}` : '')
-        .filter(s => s !== '')
-        .join('\n');
-        
-      if (links) {
-         // text += `\n\nSources consulted:\n${links}`; 
-         // We rely on the model's formatted output primarily, but this is a fallback if needed.
-      }
+    // Split text and references
+    const parts = fullText.split('### REFERENCES ###');
+    
+    if (parts.length > 1) {
+        return {
+            text: parts[0].trim(),
+            references: parts[1].trim()
+        };
     }
 
-    return text;
+    return { text: fullText, references: "" };
 
   } catch (error) {
     console.error("Gemini API Error (Search):", error);
-    // Fallback to standard generation if search fails (e.g. tier limits)
-    return generateText(`Title: ${title}. Objective: ${objective}`, "Write a clinical context summary with placeholder references.", lang);
+    return { text: "Error generating content.", references: "" };
+  }
+};
+
+// Generic Text Generation with Separated References
+export const generateTextWithRefs = async (context: string, instruction: string, lang: Language): Promise<GeneratedContentWithRefs> => {
+  if (!apiKey) return { text: "Error: API Key missing.", references: "" };
+
+  try {
+    const model = 'gemini-2.5-flash';
+    const langInstruction = lang === 'es' 
+      ? "Responde en Español. Si usas datos específicos, cita [1] y lista al final bajo '### REFERENCES ###'." 
+      : "Respond in English. If using specific facts, cite [1] and list at the end under '### REFERENCES ###'.";
+
+    const prompt = `
+      Act as an expert clinical research methodologist.
+      ${instruction}
+      ${langInstruction}
+      
+      Study Info:
+      ${context}
+      
+      Output Format:
+      [Main Text Body]
+      ### REFERENCES ###
+      [List of References in Vancouver Style if applicable, otherwise leave empty]
+    `;
+
+    const response = await ai.models.generateContent({
+      model: model,
+      contents: prompt,
+    });
+
+    let fullText = response.text?.trim() || '';
+    const parts = fullText.split('### REFERENCES ###');
+    
+    if (parts.length > 1) {
+        return {
+            text: parts[0].trim(),
+            references: parts[1].trim()
+        };
+    }
+    return { text: fullText, references: "" };
+
+  } catch (error) {
+    return { text: "", references: "" };
   }
 };

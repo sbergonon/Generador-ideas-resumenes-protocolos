@@ -9,6 +9,7 @@ export const INITIAL_PROTOCOL_DATA: ProtocolData = {
   phase: '',
   rationalePrimary: '',
   rationaleSecondary: '',
+  measurementScales: '',
   primaryObjective: '',
   secondaryObjectives: [''],
   selectionMethod: '',
@@ -20,10 +21,12 @@ export const INITIAL_PROTOCOL_DATA: ProtocolData = {
   designModel: '',
   controlType: '',
   isNested: false,
+  followUpDuration: '',
   interventions: '',
   evaluationsGeneral: '',
   evaluationsPrimary: '',
   evaluationsSecondary: [''],
+  variableDefinitions: [''],
   otherVariables: [''],
   
   // Stats
@@ -49,12 +52,14 @@ export const INITIAL_PROTOCOL_DATA: ProtocolData = {
   recruitmentProcess: '',
   dataProcessing: '',
   investigatorsLocation: '',
-  dates: {
-    presentation: '',
-    protocol: '',
-    ethicsCommittee: '',
-    startDate: '',
-    inclusionPeriod: ''
+  schedule: {
+    ethicsSubmission: '',
+    siteInitiation: '',
+    firstPatientIn: '',
+    interimAnalysis: '',
+    lastPatientOut: '',
+    dbLock: '',
+    finalReport: ''
   },
   proposedBy: '',
   proposalDate: new Date().toLocaleDateString(),

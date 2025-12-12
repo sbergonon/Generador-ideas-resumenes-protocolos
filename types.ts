@@ -12,6 +12,7 @@ export interface ProtocolData {
   rationaleSecondary: string;
   
   // Objectives
+  measurementScales: string; // New: For defining scales (e.g. Hamilton)
   primaryObjective: string;
   secondaryObjectives: string[];
   
@@ -22,26 +23,28 @@ export interface ProtocolData {
   exclusionCriteria: string[];
   
   // Design & Interventions
-  studyType: string; // Broad category (RCT, Cohort, etc.)
-  studyDesign: string; // Full text description
-  designModel: 'parallel' | 'crossover' | 'single_group' | 'factorial' | ''; // New: Specific model
-  controlType: 'placebo' | 'active' | 'historical' | 'none' | ''; // New: Type of control
-  isNested: boolean; // New: For nested case-control
+  studyType: string;
+  studyDesign: string;
+  designModel: 'parallel' | 'crossover' | 'single_group' | 'factorial' | 'pre_post' | ''; // Added pre_post
+  controlType: 'placebo' | 'active' | 'historical' | 'none' | '';
+  isNested: boolean;
+  followUpDuration: string; // New: Duration of follow-up
   interventions: string;
   
   // Evaluations
   evaluationsGeneral: string;
   evaluationsPrimary: string;
   evaluationsSecondary: string[];
+  variableDefinitions: string[]; // New: How variables are measured
   otherVariables: string[];
   
-  // Statistics & Methodology (New Structure)
-  sampleSizeJustification: string; // Final Text
-  sampleSizeMethod: 'power' | 'precision' | 'convenience' | ''; // Logic
+  // Statistics
+  sampleSizeJustification: string;
+  sampleSizeMethod: 'power' | 'precision' | 'convenience' | '';
   statsParams: {
     alpha: string;
-    power: string; // 1-beta
-    precision: string; // Confidence Interval width
+    power: string;
+    precision: string;
     dropoutRate: string;
     deltaOrEffectSize: string;
   };
@@ -50,24 +53,26 @@ export interface ProtocolData {
   subjectsPerPhysician: string;
   totalSubjects: string;
   
-  statisticalAnalysis: string[]; // Final Text List
+  statisticalAnalysis: string[];
   analysisHypothesis: 'superiority' | 'non_inferiority' | 'equivalence' | 'exploratory' | '';
-  detailedHypothesis: string; // New textual hypothesis
+  detailedHypothesis: string;
   primaryVariableType: 'continuous' | 'binary' | 'time_to_event' | '';
-  confounders: string; // Adjustment variables
+  confounders: string;
   
   // Operations
   recruitmentProcess: string;
   dataProcessing: string;
   
-  // Admin
+  // Admin & Schedule (Refined)
   investigatorsLocation: string;
-  dates: {
-    presentation: string;
-    protocol: string;
-    ethicsCommittee: string;
-    startDate: string;
-    inclusionPeriod: string;
+  schedule: {
+    ethicsSubmission: string;
+    siteInitiation: string;
+    firstPatientIn: string; // FPI
+    interimAnalysis: string; // Optional
+    lastPatientOut: string; // LPO
+    dbLock: string;
+    finalReport: string;
   };
   proposedBy: string;
   proposalDate: string;
@@ -92,5 +97,5 @@ export type Language = 'es' | 'en';
 export interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: Record<string, any>; // Dictionary
+  t: Record<string, any>;
 }

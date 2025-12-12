@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ProtocolData, SectionTab } from '../types';
-import { Plus, Trash2, Wand2, Loader2, ChevronRight, ChevronLeft, Sparkles, AlertCircle, Bot, Calculator, BarChart3, Microscope, Search, Filter } from 'lucide-react';
-import { refineText, generateList, generateText, generateContextWithSearch } from '../services/geminiService';
+import { Plus, Trash2, Wand2, Loader2, ChevronRight, ChevronLeft, Sparkles, AlertCircle, Bot, Calculator, BarChart3, Microscope, Search, Filter, Calendar, Ruler } from 'lucide-react';
+import { refineText, generateList, generateText, generateContextWithSearchAndRefs, generateTextWithRefs } from '../services/geminiService';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface Props {
@@ -76,6 +76,14 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
     onChange({ ...data, [field]: newArray });
   };
 
+  // Helper to append references to Bibliography tab
+  const appendReferences = (newRefs: string) => {
+      if (!newRefs || newRefs.length < 5) return;
+      const currentBib = data.bibliography || '';
+      const separator = currentBib.length > 0 ? '\n\n' : '';
+      handleChange('bibliography', currentBib + separator + newRefs);
+  };
+
   const handleAIRefine = async (fieldPath: string, text: string, context: string) => {
     setLoadingField(fieldPath);
     const refined = await refineText(text, context, language);
@@ -96,6 +104,18 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
     setLoadingField(null);
   };
 
+  const handleAIGenerateTextWithRefs = async (field: keyof ProtocolData, context: string, instruction: string) => {
+    setLoadingField(field);
+    const result = await generateTextWithRefs(context, instruction, language);
+    if (result.text) {
+        handleChange(field, result.text);
+        if (result.references) {
+            appendReferences(result.references);
+        }
+    }
+    setLoadingField(null);
+  };
+  
   const handleAIGenerateText = async (field: keyof ProtocolData, context: string, instruction: string) => {
     setLoadingField(field);
     const result = await generateText(context, instruction, language);
@@ -104,17 +124,20 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
     }
     setLoadingField(null);
   };
-  
+
   const handleContextSearch = async () => {
     setLoadingField('contextSummary');
-    const result = await generateContextWithSearch(data.title, data.primaryObjective, language);
-    if (result) {
-        handleChange('contextSummary', result);
+    const result = await generateContextWithSearchAndRefs(data.title, data.primaryObjective, language);
+    if (result.text) {
+        handleChange('contextSummary', result.text);
+        if (result.references) {
+            appendReferences(result.references);
+        }
     }
     setLoadingField(null);
   };
 
-  const handleAIGenerateList = async (field: 'inclusionCriteria' | 'exclusionCriteria' | 'statisticalAnalysis' | 'secondaryObjectives') => {
+  const handleAIGenerateList = async (field: 'inclusionCriteria' | 'exclusionCriteria' | 'statisticalAnalysis' | 'secondaryObjectives' | 'variableDefinitions') => {
     setLoadingField(field);
     
     let typeLabel = '';
@@ -128,6 +151,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
           Design Model: ${data.designModel || 'standard'}
           Control Type: ${data.controlType || 'N/A'}
           Detailed Hypothesis: ${data.detailedHypothesis}
+          Is Pre-Post Design: ${data.designModel === 'pre_post' ? 'YES' : 'NO'}
           
           PICO Elements:
           - Population: ${data.populationDescription}
@@ -144,6 +168,15 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
           Title: ${data.title}
           Primary Objective: ${data.primaryObjective}
           Design: ${data.studyType}
+          Measurement Scales: ${data.measurementScales}
+          Follow-up: ${data.followUpDuration}
+        `;
+    } else if (field === 'variableDefinitions') {
+        typeLabel = 'variable measurement definitions (how they are quantified, e.g. units, specific tests)';
+        context = `
+            Primary Objective: ${data.primaryObjective}
+            Scales: ${data.measurementScales}
+            Other Variables: ${data.otherVariables.join(', ')}
         `;
     } else if (field === 'inclusionCriteria' || field === 'exclusionCriteria') {
         // Enhanced logic for Inclusion/Exclusion based on Study Type and advanced design parameters
@@ -171,6 +204,8 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
              }
         } else if (studyType.toLowerCase().includes('cohort')) {
             specificity += isInc ? "Subjects free of the outcome at baseline. " : "Pre-existing outcome condition. ";
+        } else if (data.designModel === 'pre_post') {
+            specificity += isInc ? "Subjects available for both baseline and follow-up assessments. " : "Subjects likely to be lost to follow-up. ";
         }
 
         typeLabel = isInc 
@@ -292,13 +327,19 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
         total = Math.ceil(total / (1 - dropout));
     }
 
+    // 5. Set Total Subjects FIRST
     handleChange('totalSubjects', total.toString());
     
-    // 5. Auto-distribute if sites are set
+    // 6. Then distribute if sites are set
     const nPhys = parseInt(data.numPhysicians);
     if (!isNaN(nPhys) && nPhys > 0) {
         const perSite = Math.ceil(total / nPhys);
         handleChange('subjectsPerPhysician', perSite.toString());
+    } else {
+        // If no sites defined, keep 0 or blank, don't overwrite blindly
+        if (data.subjectsPerPhysician) {
+             handleChange('subjectsPerPhysician', ''); 
+        }
     }
   };
 
@@ -443,7 +484,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                   if (data.rationalePrimary && data.rationalePrimary.length > 10) {
                     handleAIRefine('rationalePrimary', data.rationalePrimary, `${instruction} Context: ${context}`);
                   } else {
-                    handleAIGenerateText('rationalePrimary', context, instruction);
+                    handleAIGenerateTextWithRefs('rationalePrimary', context, instruction);
                   }
                 }}
                 disabled={loadingField === 'rationalePrimary'}
@@ -471,7 +512,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                   if (data.rationaleSecondary && data.rationaleSecondary.length > 10) {
                     handleAIRefine('rationaleSecondary', data.rationaleSecondary, `${instruction} Context: ${context}`);
                   } else {
-                    handleAIGenerateText('rationaleSecondary', context, instruction);
+                    handleAIGenerateTextWithRefs('rationaleSecondary', context, instruction);
                   }
                 }}
                 disabled={loadingField === 'rationaleSecondary'}
@@ -489,6 +530,21 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
           <div className="space-y-6 animate-fadeIn">
              <h3 className="text-lg font-semibold text-gray-800">{t.form.tabs.Objectives}</h3>
              
+             {/* New Field: Measurement Scales */}
+             <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
+                <label className="block text-sm font-semibold text-yellow-800 mb-1 flex items-center">
+                    <Ruler className="w-4 h-4 mr-2" />
+                    {t.form.labels.scales}
+                </label>
+                <input
+                    type="text"
+                    value={data.measurementScales}
+                    onChange={(e) => handleChange('measurementScales', e.target.value)}
+                    className="block w-full rounded-md border-yellow-300 bg-white shadow-sm focus:border-yellow-500 focus:ring-yellow-500 sm:text-sm border p-2"
+                    placeholder={t.form.placeholders.scales}
+                />
+             </div>
+
              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t.form.labels.objPrimary} <span className="text-red-500">*</span></label>
                 <textarea
@@ -503,8 +559,8 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                 
                 <button
                   onClick={() => {
-                     const context = `Title: ${data.title}. Study Design: ${data.studyDesign}. Population: ${data.populationDescription}.`;
-                     const instruction = "Rewrite the Primary Objective to be SMART (Specific, Measurable, Achievable, Relevant, Time-bound). Clearly state the population, intervention/exposure, comparator (if applicable), and outcome.";
+                     const context = `Title: ${data.title}. Study Design: ${data.studyDesign}. Population: ${data.populationDescription}. Scales/Metrics: ${data.measurementScales}. Follow-up Duration: ${data.followUpDuration}`;
+                     const instruction = "Rewrite the Primary Objective to be SMART (Specific, Measurable, Achievable, Relevant, Time-bound). Clearly state the population, intervention/exposure, comparator (if applicable), outcome, and specific measures/scales if provided.";
                      handleAIRefine('primaryObjective', data.primaryObjective, `${instruction} Context: ${context}`);
                   }}
                   disabled={!data.primaryObjective || loadingField === 'primaryObjective'}
@@ -540,7 +596,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                             />
                              <button
                                 onClick={() => {
-                                  const context = `Primary Objective: ${data.primaryObjective}. Study Title: ${data.title}.`;
+                                  const context = `Primary Objective: ${data.primaryObjective}. Study Title: ${data.title}. Scales: ${data.measurementScales}`;
                                   const instruction = "Rewrite this Secondary Objective to be SMART (Specific, Measurable, Achievable, Relevant, Time-bound).";
                                   handleAIRefine(`secondaryObjectives[${idx}]`, obj, `${instruction} Context: ${context}`);
                                 }}
@@ -721,9 +777,8 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                     </div>
 
                     <div className="flex flex-col gap-2">
-                         {/* Optional Subtypes based on broad type */}
-                         {data.studyType.toLowerCase().includes('ensayo') || data.studyType.toLowerCase().includes('rct') ? (
-                            <div className="grid grid-cols-2 gap-2">
+                         {/* Design Subtypes */}
+                         <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.studySubtype}</label>
                                     <select
@@ -735,6 +790,8 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                                         <option value="parallel">{t.form.designModels.parallel}</option>
                                         <option value="crossover">{t.form.designModels.crossover}</option>
                                         <option value="factorial">{t.form.designModels.factorial}</option>
+                                        <option value="pre_post">{t.form.designModels.pre_post}</option>
+                                        <option value="single_group">{t.form.designModels.single_group}</option>
                                     </select>
                                 </div>
                                 <div>
@@ -751,22 +808,35 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                                     </select>
                                 </div>
                             </div>
-                         ) : null}
                          
-                         {data.studyType.toLowerCase().includes('casos') || data.studyType.toLowerCase().includes('case') ? (
-                             <div className="flex items-center pt-6">
+                         <div className="flex gap-4 pt-2 items-center">
+                              {data.studyType.toLowerCase().includes('casos') && (
+                                 <div className="flex items-center">
+                                    <input
+                                        id="nested-check"
+                                        type="checkbox"
+                                        checked={data.isNested || false}
+                                        onChange={(e) => handleChange('isNested', e.target.checked)}
+                                        className="h-4 w-4 text-medical-600 focus:ring-medical-500 border-gray-300 rounded"
+                                    />
+                                    <label htmlFor="nested-check" className="ml-2 block text-xs text-gray-900">
+                                        {t.form.labels.isNested}
+                                    </label>
+                                 </div>
+                              )}
+                              
+                             {/* Follow-up Duration */}
+                             <div className="flex-1">
+                                <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.followUp}</label>
                                 <input
-                                    id="nested-check"
-                                    type="checkbox"
-                                    checked={data.isNested || false}
-                                    onChange={(e) => handleChange('isNested', e.target.checked)}
-                                    className="h-4 w-4 text-medical-600 focus:ring-medical-500 border-gray-300 rounded"
+                                    type="text"
+                                    value={data.followUpDuration}
+                                    onChange={(e) => handleChange('followUpDuration', e.target.value)}
+                                    className="block w-full rounded-md border-gray-300 text-xs p-1.5"
+                                    placeholder={t.form.placeholders.followUp}
                                 />
-                                <label htmlFor="nested-check" className="ml-2 block text-sm text-gray-900">
-                                    {t.form.labels.isNested}
-                                </label>
                              </div>
-                         ) : null}
+                         </div>
                     </div>
                 </div>
 
@@ -789,15 +859,15 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                           
                           Structure the response to include:
                           1. Design Classification: Incorporate the specific study type (${studyType}) and subtypes (Model: ${data.designModel || 'standard'}, Control: ${data.controlType || 'N/A'}, Nested: ${data.isNested ? 'Yes' : 'No'}).
-                          2. Methodological Description: Detail the structure of the study (e.g., randomization, blinding, time-direction).
+                          2. Methodological Description: Detail the structure of the study (e.g., randomization, blinding, time-direction). Mention the follow-up period: ${data.followUpDuration}.
                           3. Data Interpretation Implications: Explicitly state the methodological implications for data interpretation (e.g., ability to prove causality for RCTs, association vs causation for observational, potential biases like recall bias in case-control).
                           
                           Use standard research terminology (e.g., multicenter, prospective, randomized, crossover/parallel, etc., as appropriate).`;
                           
-                          const context = `Title: ${data.title}\nPrimary Objective: ${data.primaryObjective}\nStudy Type: ${studyType}\nDesign Model: ${data.designModel}\nControl Type: ${data.controlType}`;
+                          const context = `Title: ${data.title}\nPrimary Objective: ${data.primaryObjective}\nStudy Type: ${studyType}\nDesign Model: ${data.designModel}\nControl Type: ${data.controlType}\nFollow-up: ${data.followUpDuration}`;
                           
                           if (!data.studyDesign) {
-                              handleAIGenerateText('studyDesign', context, instruction);
+                              handleAIGenerateTextWithRefs('studyDesign', context, instruction);
                           } else {
                               handleAIRefine('studyDesign', data.studyDesign, `${instruction} Context: ${context}`);
                           }
@@ -840,6 +910,39 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                         className="block w-full rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm border p-2"
                     />
                 </div>
+                
+                 <div>
+                    <div className="flex justify-between items-center mb-1">
+                        <label className="block text-sm font-medium text-gray-700">{t.form.labels.varDefs}</label>
+                        <button
+                            onClick={() => handleAIGenerateList('variableDefinitions')}
+                            disabled={loadingField === 'variableDefinitions'}
+                            className="text-xs text-medical-600 hover:text-medical-800 flex items-center"
+                        >
+                             {loadingField === 'variableDefinitions' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Bot className="w-3 h-3 mr-1" />}
+                            {t.form.aiSuggest}
+                        </button>
+                    </div>
+                     {data.variableDefinitions.map((item, idx) => (
+                        <div key={idx} className="flex gap-2 mb-2">
+                             <span className="pt-2 text-gray-500 font-mono text-xs">●</span>
+                            <input
+                                type="text"
+                                value={item}
+                                onChange={(e) => handleArrayChange('variableDefinitions', idx, e.target.value)}
+                                className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm border p-2"
+                                placeholder="How is it measured? (e.g. units/day)"
+                            />
+                             <button onClick={() => removeArrayItem('variableDefinitions', idx)} className="text-red-500 hover:text-red-700">
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        </div>
+                    ))}
+                    <button onClick={() => addArrayItem('variableDefinitions')} className="flex items-center text-sm text-medical-600 hover:text-medical-800 font-medium">
+                        <Plus className="w-4 h-4 mr-1" />
+                    </button>
+                </div>
+
                 
                 <div>
                      <label className="block text-sm font-medium text-gray-700 mb-1">{t.form.labels.otherVars}</label>
@@ -988,22 +1091,23 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
                         />
                     </div>
-                     <div>
-                        <label className="block text-sm font-medium text-gray-700">{t.form.labels.nSubj}</label>
-                        <input
-                            type="number"
-                            value={data.subjectsPerPhysician}
-                            onChange={(e) => handleChange('subjectsPerPhysician', e.target.value)}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
-                        />
-                    </div>
-                     <div>
+                    <div>
                         <label className="block text-sm font-medium text-gray-700">{t.form.labels.nTotal}</label>
                         <input
                             type="number"
                             value={data.totalSubjects}
                             onChange={(e) => handleChange('totalSubjects', e.target.value)}
                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
+                        />
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-gray-700">{t.form.labels.nSubj}</label>
+                        <input
+                            type="number"
+                            value={data.subjectsPerPhysician}
+                            onChange={(e) => handleChange('subjectsPerPhysician', e.target.value)}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
+                            readOnly
                         />
                     </div>
                 </div>
@@ -1057,8 +1161,8 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                         />
                          <button
                             onClick={() => {
-                                const context = `Objective: ${data.primaryObjective}. Study Type: ${data.studyType}. Hypothesis Type: ${data.analysisHypothesis}. Effect Size: ${data.statsParams.deltaOrEffectSize}.`;
-                                const instruction = "Write a formal hypothesis statement text (e.g., 'Treatment X is superior to Y...'). If observational, state the association. If non-inferiority, mention the margin.";
+                                const context = `Objective: ${data.primaryObjective}. Study Type: ${data.studyType}. Hypothesis Type: ${data.analysisHypothesis}. Effect Size: ${data.statsParams.deltaOrEffectSize}. Scales: ${data.measurementScales}`;
+                                const instruction = "Write a formal hypothesis statement text (e.g., 'Treatment X is superior to Y...'). If observational, state the association. If non-inferiority, mention the margin. Include the specific scale metrics if applicable.";
                                 handleAIGenerateText('detailedHypothesis', context, instruction);
                             }}
                             disabled={loadingField === 'detailedHypothesis'}
@@ -1179,25 +1283,76 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                     />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Date 1</label>
-                        <input
-                            type="text"
-                            value={data.dates.presentation}
-                            onChange={(e) => handleDeepChange('dates', 'presentation', e.target.value)}
-                            className="mt-1 block w-full border p-2 rounded-md"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Date 2</label>
-                        <input
-                            type="text"
-                            value={data.dates.startDate}
-                            onChange={(e) => handleDeepChange('dates', 'startDate', e.target.value)}
-                            className="mt-1 block w-full border p-2 rounded-md"
-                        />
-                    </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                     <h4 className="font-bold text-gray-700 mb-3 flex items-center">
+                         <Calendar className="w-4 h-4 mr-2" />
+                         {t.form.labels.schedule}
+                     </h4>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.ethSub}</label>
+                            <input
+                                type="text"
+                                value={data.schedule?.ethicsSubmission || ''}
+                                onChange={(e) => handleDeepChange('schedule', 'ethicsSubmission', e.target.value)}
+                                className="block w-full rounded-md border-gray-300 text-sm p-2"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.siteInit}</label>
+                            <input
+                                type="text"
+                                value={data.schedule?.siteInitiation || ''}
+                                onChange={(e) => handleDeepChange('schedule', 'siteInitiation', e.target.value)}
+                                className="block w-full rounded-md border-gray-300 text-sm p-2"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.fpi}</label>
+                            <input
+                                type="text"
+                                value={data.schedule?.firstPatientIn || ''}
+                                onChange={(e) => handleDeepChange('schedule', 'firstPatientIn', e.target.value)}
+                                className="block w-full rounded-md border-gray-300 text-sm p-2"
+                            />
+                        </div>
+                         <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.interim}</label>
+                            <input
+                                type="text"
+                                value={data.schedule?.interimAnalysis || ''}
+                                onChange={(e) => handleDeepChange('schedule', 'interimAnalysis', e.target.value)}
+                                className="block w-full rounded-md border-gray-300 text-sm p-2"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.lpo}</label>
+                            <input
+                                type="text"
+                                value={data.schedule?.lastPatientOut || ''}
+                                onChange={(e) => handleDeepChange('schedule', 'lastPatientOut', e.target.value)}
+                                className="block w-full rounded-md border-gray-300 text-sm p-2"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.dbLock}</label>
+                            <input
+                                type="text"
+                                value={data.schedule?.dbLock || ''}
+                                onChange={(e) => handleDeepChange('schedule', 'dbLock', e.target.value)}
+                                className="block w-full rounded-md border-gray-300 text-sm p-2"
+                            />
+                        </div>
+                         <div className="md:col-span-2">
+                            <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.finalRep}</label>
+                            <input
+                                type="text"
+                                value={data.schedule?.finalReport || ''}
+                                onChange={(e) => handleDeepChange('schedule', 'finalReport', e.target.value)}
+                                className="block w-full rounded-md border-gray-300 text-sm p-2"
+                            />
+                        </div>
+                     </div>
                 </div>
             </div>
         );
