@@ -147,26 +147,53 @@ export interface GeneratedContentWithRefs {
 
 // Helper to separate text from references
 const extractReferences = (fullText: string): GeneratedContentWithRefs => {
-    // Attempt to split by common delimiters used by the model
+    // Delimiters
     const splitters = [
         '### REFERENCES ###',
         '### References ###',
-        '### Referencias ###',
+        '### REFERENCIAS ###',
+        '### Bibliografía ###',
         '**References**',
-        '**Referencias**',
-        'References:',
-        'Referencias:'
+        '**Referencias**'
     ];
 
     for (const splitter of splitters) {
         if (fullText.includes(splitter)) {
             const parts = fullText.split(splitter);
-            // The last part is likely the references, everything before is text
+            // The last part is likely the references
             if (parts.length > 1) {
+                // Join everything EXCEPT the last part as text
                 const references = parts.pop()?.trim() || "";
-                const text = parts.join(splitter).trim(); // Rejoin in case splitter appeared earlier (unlikely but safe)
+                const text = parts.join("").trim(); 
                 return { text, references };
             }
+        }
+    }
+
+    // Fallback: Try to find typical Vancouver patterns at the end
+    // Matches "1. Author..." or "[1] Author..." at the start of lines near the end
+    const lines = fullText.split('\n');
+    let splitIndex = -1;
+    
+    // Look backwards for a cluster of references
+    for (let i = lines.length - 1; i >= 0; i--) {
+        const line = lines[i].trim();
+        if (line === '') continue;
+        // Check if line looks like a reference start
+        if (/^(\d+\.|\[\d+\])\s+[A-Z]/.test(line)) {
+            splitIndex = i;
+        } else if (splitIndex !== -1 && i < splitIndex - 1) {
+            // If we found references but now encounter a non-reference line (and not just one previous line which might be continuation), stop
+            break;
+        }
+    }
+
+    if (splitIndex > 0) {
+        const text = lines.slice(0, splitIndex).join('\n').trim();
+        const references = lines.slice(splitIndex).join('\n').trim();
+        // Only return if references look substantial
+        if (references.length > 20) {
+             return { text, references };
         }
     }
 
@@ -182,8 +209,8 @@ export const generateContextWithSearchAndRefs = async (title: string, objective:
   try {
     const model = 'gemini-2.5-flash'; 
     const langInstruction = lang === 'es' 
-      ? "Escribe en Español. Usa referencias numéricas en el texto [1], [2]. IMPORTANTE: Al final, añade una sección estricta '### REFERENCES ###' con la bibliografía." 
-      : "Write in English. Use numeric citations in text [1], [2]. IMPORTANT: At the end, add a strict section '### REFERENCES ###' with the bibliography.";
+      ? "Escribe en Español. Usa referencias numéricas en el texto [1], [2]. IMPORTANTE: Coloca TODAS las referencias completas ÚNICAMENTE al final del todo, separadas por '### REFERENCES ###'." 
+      : "Write in English. Use numeric citations in text [1], [2]. IMPORTANT: Place ALL full references ONLY at the very end, separated by '### REFERENCES ###'.";
 
     const prompt = `
       You are a clinical research expert performing a literature review.
@@ -194,11 +221,11 @@ export const generateContextWithSearchAndRefs = async (title: string, objective:
       
       Instructions:
       1. Explain the disease/condition background.
-      2. Explain the current gap in knowledge or the need for this specific study (Rationale).
-      3. Use Google Search to find relevant, real, and recent medical literature (Pubmed/Medline sources preferred).
-      4. Cite these sources in the text using numbers [1], [2]...
-      5. List the full references at the bottom explicitly separated by '### REFERENCES ###'.
-      6. ${langInstruction}
+      2. Explain the current gap in knowledge (Rationale).
+      3. Use Google Search to find relevant, real medical literature.
+      4. Cite sources in text [1].
+      5. ${langInstruction}
+      6. DO NOT include the list of references inside the main text. Only put them after the delimiter.
     `;
 
     const response = await ai.models.generateContent({
@@ -225,8 +252,8 @@ export const generateTextWithRefs = async (context: string, instruction: string,
   try {
     const model = 'gemini-2.5-flash';
     const langInstruction = lang === 'es' 
-      ? "Responde en Español. Si usas datos específicos, cita [1]. IMPORTANTE: Pon la lista completa al final bajo el separador '### REFERENCES ###'." 
-      : "Respond in English. If using specific facts, cite [1]. IMPORTANT: Put the full list at the end under the separator '### REFERENCES ###'.";
+      ? "Responde en Español. Cita con [1]. Pon la lista de bibliografía AL FINAL separada por '### REFERENCES ###'." 
+      : "Respond in English. Cite with [1]. Put the bibliography list AT THE END separated by '### REFERENCES ###'.";
 
     const prompt = `
       Act as an expert clinical research methodologist.
@@ -240,7 +267,7 @@ export const generateTextWithRefs = async (context: string, instruction: string,
       [Main Text Body]
       
       ### REFERENCES ###
-      [List of References in Vancouver Style if applicable]
+      [List of References in Vancouver Style]
     `;
 
     const response = await ai.models.generateContent({

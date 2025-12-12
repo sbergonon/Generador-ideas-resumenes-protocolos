@@ -37,7 +37,32 @@ const MainApp: React.FC = () => {
       if (saved) {
         if (window.confirm(t.app.confirmLoad)) {
             const parsed = JSON.parse(saved);
-            setProtocolData(parsed);
+            
+            // Smart Merge: Ensure new fields from INITIAL_PROTOCOL_DATA exist in the loaded data
+            // This prevents "Blank Screen" crashes when loading old drafts without 'schedule' or 'appendices'
+            const mergedData: ProtocolData = {
+                ...INITIAL_PROTOCOL_DATA, // Start with full new structure
+                ...parsed, // Override with saved data
+                // Deep merge nested objects to avoid overwriting them with undefined
+                statsParams: { 
+                    ...INITIAL_PROTOCOL_DATA.statsParams, 
+                    ...(parsed.statsParams || {}) 
+                },
+                schedule: { 
+                    ...INITIAL_PROTOCOL_DATA.schedule, 
+                    ...(parsed.schedule || {}) 
+                },
+                // Ensure arrays are arrays (fallback to initial if missing)
+                secondaryObjectives: parsed.secondaryObjectives || INITIAL_PROTOCOL_DATA.secondaryObjectives,
+                inclusionCriteria: parsed.inclusionCriteria || INITIAL_PROTOCOL_DATA.inclusionCriteria,
+                exclusionCriteria: parsed.exclusionCriteria || INITIAL_PROTOCOL_DATA.exclusionCriteria,
+                evaluationsSecondary: parsed.evaluationsSecondary || INITIAL_PROTOCOL_DATA.evaluationsSecondary,
+                variableDefinitions: parsed.variableDefinitions || INITIAL_PROTOCOL_DATA.variableDefinitions,
+                otherVariables: parsed.otherVariables || INITIAL_PROTOCOL_DATA.otherVariables,
+                statisticalAnalysis: parsed.statisticalAnalysis || INITIAL_PROTOCOL_DATA.statisticalAnalysis,
+            };
+
+            setProtocolData(mergedData);
             if (view === 'welcome') setView('editor');
             alert(t.app.loadSuccess);
         }
@@ -45,6 +70,7 @@ const MainApp: React.FC = () => {
         alert(t.app.noDraft);
       }
     } catch (e) {
+      console.error(e);
       alert('Error loading draft.');
     }
   };
