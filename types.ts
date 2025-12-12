@@ -49,6 +49,7 @@ export interface ProtocolData {
   
   statisticalAnalysis: string[]; // Final Text List
   analysisHypothesis: 'superiority' | 'non_inferiority' | 'equivalence' | 'exploratory' | '';
+  detailedHypothesis: string; // New textual hypothesis
   primaryVariableType: 'continuous' | 'binary' | 'time_to_event' | '';
   confounders: string; // Adjustment variables
   

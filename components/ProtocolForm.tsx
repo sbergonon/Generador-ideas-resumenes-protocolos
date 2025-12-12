@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ProtocolData, SectionTab } from '../types';
-import { Plus, Trash2, Wand2, Loader2, ChevronRight, ChevronLeft, Sparkles, AlertCircle, Bot, Calculator, BarChart3, Microscope } from 'lucide-react';
-import { refineText, generateList, generateText } from '../services/geminiService';
+import { Plus, Trash2, Wand2, Loader2, ChevronRight, ChevronLeft, Sparkles, AlertCircle, Bot, Calculator, BarChart3, Microscope, Search } from 'lucide-react';
+import { refineText, generateList, generateText, generateContextWithSearch } from '../services/geminiService';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface Props {
@@ -52,7 +52,8 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
 
   const handleDeepChange = (parent: keyof ProtocolData, child: string, value: string) => {
     // @ts-ignore
-    const newParent = { ...data[parent], [child]: value };
+    const parentObj = data[parent] || {};
+    const newParent = { ...parentObj, [child]: value };
     onChange({ ...data, [parent]: newParent });
   };
 
@@ -103,6 +104,15 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
     }
     setLoadingField(null);
   };
+  
+  const handleContextSearch = async () => {
+    setLoadingField('contextSummary');
+    const result = await generateContextWithSearch(data.title, data.primaryObjective, language);
+    if (result) {
+        handleChange('contextSummary', result);
+    }
+    setLoadingField(null);
+  };
 
   const handleAIGenerateList = async (field: 'inclusionCriteria' | 'exclusionCriteria' | 'statisticalAnalysis') => {
     setLoadingField(field);
@@ -115,6 +125,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
         context = `
           Title: ${data.title}
           Design: ${data.studyType}
+          Primary Objective: ${data.primaryObjective}
           Hypothesis: ${data.analysisHypothesis}
           Primary Variable: ${data.primaryVariableType}
           Confounders: ${data.confounders}
@@ -199,23 +210,19 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t.form.labels.context}</label>
                 <textarea
-                  rows={4}
+                  rows={6}
                   value={data.contextSummary}
                   onChange={(e) => handleChange('contextSummary', e.target.value)}
                   className="block w-full rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm border p-2"
                   placeholder={t.form.placeholders.context}
                 />
                 <button
-                    onClick={() => {
-                       const context = `Title: ${data.title}\nObj: ${data.primaryObjective}\nPop: ${data.populationDescription}`;
-                       const instruction = "Generate a concise executive summary (Introduction) for this protocol.";
-                       handleAIGenerateText('contextSummary', context, instruction);
-                    }}
+                    onClick={handleContextSearch}
                     disabled={loadingField === 'contextSummary'}
                     className="absolute right-2 bottom-2 bg-medical-50 text-medical-700 hover:bg-medical-100 px-3 py-1 rounded-md text-xs font-medium flex items-center transition-colors shadow-sm border border-medical-200"
                  >
-                   {loadingField === 'contextSummary' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Sparkles className="w-3 h-3 mr-1" />}
-                   {t.form.aiGenerate}
+                   {loadingField === 'contextSummary' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Search className="w-3 h-3 mr-1" />}
+                   {t.form.aiContext}
                  </button>
               </div>
 
@@ -592,15 +599,31 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                             <>
                                 <div>
                                     <label className="block text-xs text-gray-600 mb-1">{t.form.labels.alpha}</label>
-                                    <input type="text" value={data.statsParams?.alpha} onChange={(e) => handleDeepChange('statsParams', 'alpha', e.target.value)} className="w-full rounded border-gray-300 text-sm p-1.5" />
+                                    <input 
+                                      type="number"
+                                      step="0.01" 
+                                      min="0"
+                                      max="1"
+                                      value={data.statsParams?.alpha || ''} 
+                                      onChange={(e) => handleDeepChange('statsParams', 'alpha', e.target.value)} 
+                                      className="w-full rounded border-gray-300 text-sm p-1.5" 
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-xs text-gray-600 mb-1">{t.form.labels.power}</label>
-                                    <input type="text" value={data.statsParams?.power} onChange={(e) => handleDeepChange('statsParams', 'power', e.target.value)} className="w-full rounded border-gray-300 text-sm p-1.5" />
+                                    <input 
+                                      type="number"
+                                      step="0.05"
+                                      min="0"
+                                      max="1"
+                                      value={data.statsParams?.power || ''} 
+                                      onChange={(e) => handleDeepChange('statsParams', 'power', e.target.value)} 
+                                      className="w-full rounded border-gray-300 text-sm p-1.5" 
+                                    />
                                 </div>
                                 <div className="col-span-2">
                                     <label className="block text-xs text-gray-600 mb-1">{t.form.labels.effectSize}</label>
-                                    <input type="text" placeholder="e.g. Cohen's d = 0.5" value={data.statsParams?.deltaOrEffectSize} onChange={(e) => handleDeepChange('statsParams', 'deltaOrEffectSize', e.target.value)} className="w-full rounded border-gray-300 text-sm p-1.5" />
+                                    <input type="text" placeholder="e.g. Cohen's d = 0.5" value={data.statsParams?.deltaOrEffectSize || ''} onChange={(e) => handleDeepChange('statsParams', 'deltaOrEffectSize', e.target.value)} className="w-full rounded border-gray-300 text-sm p-1.5" />
                                 </div>
                             </>
                         )}
@@ -608,17 +631,17 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                             <>
                                 <div>
                                     <label className="block text-xs text-gray-600 mb-1">{t.form.labels.precision}</label>
-                                    <input type="text" placeholder="e.g. 95%" value={data.statsParams?.precision} onChange={(e) => handleDeepChange('statsParams', 'precision', e.target.value)} className="w-full rounded border-gray-300 text-sm p-1.5" />
+                                    <input type="text" placeholder="e.g. 95%" value={data.statsParams?.precision || ''} onChange={(e) => handleDeepChange('statsParams', 'precision', e.target.value)} className="w-full rounded border-gray-300 text-sm p-1.5" />
                                 </div>
                                 <div>
                                     <label className="block text-xs text-gray-600 mb-1">{t.form.labels.effectSize}</label>
-                                    <input type="text" placeholder="e.g. Width 5 points" value={data.statsParams?.deltaOrEffectSize} onChange={(e) => handleDeepChange('statsParams', 'deltaOrEffectSize', e.target.value)} className="w-full rounded border-gray-300 text-sm p-1.5" />
+                                    <input type="text" placeholder="e.g. Width 5 points" value={data.statsParams?.deltaOrEffectSize || ''} onChange={(e) => handleDeepChange('statsParams', 'deltaOrEffectSize', e.target.value)} className="w-full rounded border-gray-300 text-sm p-1.5" />
                                 </div>
                             </>
                         )}
                          <div className="col-span-2">
                             <label className="block text-xs text-gray-600 mb-1">{t.form.labels.dropout}</label>
-                            <input type="text" value={data.statsParams?.dropoutRate} onChange={(e) => handleDeepChange('statsParams', 'dropoutRate', e.target.value)} className="w-full rounded border-gray-300 text-sm p-1.5" />
+                            <input type="text" value={data.statsParams?.dropoutRate || ''} onChange={(e) => handleDeepChange('statsParams', 'dropoutRate', e.target.value)} className="w-full rounded border-gray-300 text-sm p-1.5" />
                         </div>
                     </div>
 
@@ -633,7 +656,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                         <button
                             onClick={() => {
                                 const methodMap = {power: "Power-based calculation (Superiority)", precision: "Precision-based calculation (Estimation/CI)", convenience: "Feasibility/Convenience"};
-                                const context = `Method: ${methodMap[data.sampleSizeMethod as keyof typeof methodMap]}. Alpha: ${data.statsParams.alpha}. Power/Precision: ${data.statsParams.power || data.statsParams.precision}. Effect/Margin: ${data.statsParams.deltaOrEffectSize}. Dropout: ${data.statsParams.dropoutRate}. Study Type: ${data.studyType}.`;
+                                const context = `Method: ${methodMap[data.sampleSizeMethod as keyof typeof methodMap] || 'N/A'}. Alpha: ${data.statsParams?.alpha}. Power/Precision: ${data.statsParams?.power || data.statsParams?.precision}. Effect/Margin: ${data.statsParams?.deltaOrEffectSize}. Dropout: ${data.statsParams?.dropoutRate}. Study Type: ${data.studyType}.`;
                                 const instruction = "Write a formal Sample Size Justification paragraph. Mention the parameters used. If precision-based, emphasize Confidence Interval width. If power-based, mention Type I/II errors. If convenience, justify based on feasibility/pilot nature.";
                                 handleAIGenerateText('sampleSizeJustification', context, instruction);
                             }}
@@ -713,6 +736,30 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                         </div>
                     </div>
                     
+                    {/* Detailed Hypothesis Text Area */}
+                    <div className="relative">
+                        <label className="block text-xs font-semibold text-purple-800 mb-1 uppercase tracking-wide">{t.form.labels.detailedHyp}</label>
+                        <textarea
+                            rows={3}
+                            value={data.detailedHypothesis}
+                            onChange={(e) => handleChange('detailedHypothesis', e.target.value)}
+                            className="block w-full rounded-md border-purple-200 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm p-2"
+                            placeholder={t.form.placeholders.detailedHyp}
+                        />
+                         <button
+                            onClick={() => {
+                                const context = `Objective: ${data.primaryObjective}. Study Type: ${data.studyType}. Hypothesis Type: ${data.analysisHypothesis}. Effect Size: ${data.statsParams.deltaOrEffectSize}.`;
+                                const instruction = "Write a formal hypothesis statement text (e.g., 'Treatment X is superior to Y...'). If observational, state the association. If non-inferiority, mention the margin.";
+                                handleAIGenerateText('detailedHypothesis', context, instruction);
+                            }}
+                            disabled={loadingField === 'detailedHypothesis'}
+                            className="absolute right-2 bottom-2 bg-white text-purple-600 border border-purple-200 hover:bg-purple-50 px-3 py-1 rounded-md text-xs font-medium flex items-center transition-colors shadow-sm"
+                        >
+                            {loadingField === 'detailedHypothesis' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                            Generate Hypothesis
+                        </button>
+                    </div>
+                    
                     <div>
                         <label className="block text-xs font-semibold text-purple-800 mb-1 uppercase tracking-wide">{t.form.labels.confounders}</label>
                         <input 
@@ -747,7 +794,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                                         className="block w-full rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm border p-2 pr-10"
                                     />
                                     <button
-                                    onClick={() => handleAIRefine(`statisticalAnalysis[${idx}]`, item, `Statistical analysis method. Context: ${data.studyType} - ${data.analysisHypothesis}`)}
+                                    onClick={() => handleAIRefine(`statisticalAnalysis[${idx}]`, item, `Statistical analysis step description. Context: Study Type: ${data.studyType}. Primary Objective: ${data.primaryObjective}. Hypothesis: ${data.analysisHypothesis}. Variable: ${data.primaryVariableType}.`)}
                                     disabled={loadingField === `statisticalAnalysis[${idx}]`}
                                     className="absolute right-2 top-2 p-1 text-medical-600 hover:bg-medical-50 rounded-md transition-colors disabled:opacity-50"
                                     >

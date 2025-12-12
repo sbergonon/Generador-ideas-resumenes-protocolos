@@ -36,13 +36,15 @@ export const UserManualModal: React.FC<Props> = ({ isOpen, onClose }) => {
           </section>
 
           <section className="space-y-2">
-            <h3 className="font-bold text-medical-700 text-lg border-b border-medical-100 pb-1">{t.manual.section2}</h3>
+            <h3 className="font-bold text-medical-700 text-lg border-b border-medical-100 pb-1 flex items-center">
+              {t.manual.section2} <Wand2 className="w-4 h-4 ml-2 text-purple-500" />
+            </h3>
             <p className="text-sm leading-relaxed">{t.manual.text2}</p>
           </section>
 
           <section className="space-y-2">
             <h3 className="font-bold text-medical-700 text-lg border-b border-medical-100 pb-1 flex items-center">
-              {t.manual.section3} <Wand2 className="w-4 h-4 ml-2 text-purple-500" />
+              {t.manual.section3}
             </h3>
             <p className="text-sm leading-relaxed">{t.manual.text3}</p>
           </section>

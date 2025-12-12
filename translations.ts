@@ -24,7 +24,7 @@ export const translations = {
       disclaimer: "Disclaimer: Esta herramienta genera borradores. Todo protocolo debe ser revisado por un profesional y aprobado por Comités de Ética.",
       startBtn: "Comenzar Nuevo Protocolo",
       manualBtn: "Leer Manual de Usuario",
-      version: "Versión 2.2 | Multilingüe | Stats Avanzadas",
+      version: "Versión 2.3 | Hypo-Gen | PubMed Search",
     },
     wizard: {
       step1Title: "Definición PICO",
@@ -69,6 +69,7 @@ export const translations = {
       },
       aiRefine: "Mejorar redacción con IA",
       aiGenerate: "Generar con IA",
+      aiContext: "Investigar (PubMed/Web)",
       aiSuggest: "Sugerir",
       aiClassify: "Clasificar con IA",
       required: "Este campo es obligatorio",
@@ -104,7 +105,8 @@ export const translations = {
         biblio: "Referencias Bibliográficas",
         // New Stats Labels
         calcMethod: "Método de Cálculo",
-        hypType: "Hipótesis de Trabajo",
+        hypType: "Tipo de Hipótesis",
+        detailedHyp: "Formulación de la Hipótesis",
         varType: "Tipo Variable Principal",
         confounders: "Variables de Confusión / Ajuste",
         effectSize: "Tamaño del Efecto / MNI",
@@ -115,7 +117,7 @@ export const translations = {
       },
       placeholders: {
         title: "Ej: Estudio sobre...",
-        context: "Resumen ejecutivo...",
+        context: "Resumen ejecutivo con antecedentes...",
         obj: "Evaluar la eficacia...",
         pop: "Características generales...",
         method: "Pacientes consecutivos...",
@@ -123,7 +125,8 @@ export const translations = {
         process: "Logística y operativa...",
         data: "CRD, monitorización, limpieza...",
         biblio: "Pegue aquí sus referencias...",
-        confounders: "Edad, sexo, comorbilidades..."
+        confounders: "Edad, sexo, comorbilidades...",
+        detailedHyp: "Ej: El fármaco A es superior al B reduciendo la variable X en Y unidades..."
       },
       statsOptions: {
         power: "Basado en Potencia (Clásico)",
@@ -164,6 +167,7 @@ export const translations = {
       subjects: "sujetos/médico",
       total: "Total:",
       stats: "Análisis Estadístico",
+      hyp: "Hipótesis:",
       dev: "Desarrollo",
       data: "Gestión de Datos",
       dates: "Fechas",
@@ -175,15 +179,15 @@ export const translations = {
       title: "Manual de Usuario",
       intro: "Guía rápida para utilizar Clinical Protocol Studio.",
       section1: "1. Asistente de Ideas (Wizard)",
-      text1: "Utilice el formato PICO (Población, Intervención, Comparador, Outcome) para definir su pregunta. El sistema seleccionará automáticamente el diseño metodológico (Ensayo Clínico vs Observacional) basándose en sus respuestas.",
-      section2: "2. Editor de Protocolo",
-      text2: "Navegue por las pestañas (General, Justificación, etc.) para completar los detalles. Los campos marcados con asterisco (*) son obligatorios.",
-      section3: "3. Inteligencia Artificial (IA)",
-      text3: "Busque los botones de 'Varita Mágica' o 'Robot'. La IA puede: a) Redactar textos desde cero (Generar), b) Mejorar su redacción (Refinar), c) Sugerir criterios de inclusión/exclusión o referencias bibliográficas.",
+      text1: "Utilice el formato PICO para definir su pregunta. El sistema redactará automáticamente una hipótesis formal (Superioridad/No-Inferioridad) si el estudio es experimental, o de asociación si es observacional.",
+      section2: "2. Búsqueda de Referencias (Contexto)",
+      text2: "En la pestaña 'General', use el botón 'Investigar' para que la IA busque en internet (PubMed/Web) antecedentes reales y redacte un contexto justificado con referencias.",
+      section3: "3. Formulación de Hipótesis",
+      text3: "En la pestaña 'Estadística', defina textualmente su hipótesis (ej: 'X es superior a Y en Z unidades'). Esto es crítico para el cálculo del tamaño muestral en estudios experimentales.",
       section4: "4. Gestión de Datos",
-      text4: "Puede guardar un borrador en su navegador localmente ('Guardar') y recuperarlo más tarde ('Cargar'). Use 'Restaurar' para limpiar el formulario.",
+      text4: "Puede guardar un borrador localmente y recuperarlo más tarde. Use 'Restaurar' para limpiar.",
       section5: "5. Idioma",
-      text5: "Cambie entre Español e Inglés en la barra superior. La IA generará contenido en el idioma seleccionado."
+      text5: "Cambie entre Español e Inglés. La IA respetará el idioma seleccionado para la búsqueda y redacción."
     }
   },
   en: {
@@ -211,7 +215,7 @@ export const translations = {
       disclaimer: "Disclaimer: This tool generates drafts. All protocols must be reviewed by a professional and approved by Ethics Committees.",
       startBtn: "Start New Protocol",
       manualBtn: "Read User Manual",
-      version: "Version 2.2 | Multilingual | Advanced Stats",
+      version: "Version 2.3 | Hypo-Gen | PubMed Search",
     },
     wizard: {
       step1Title: "PICO Definition",
@@ -256,6 +260,7 @@ export const translations = {
       },
       aiRefine: "Refine with AI",
       aiGenerate: "Generate with AI",
+      aiContext: "Research (PubMed/Web)",
       aiSuggest: "Suggest",
       aiClassify: "Classify with AI",
       required: "This field is required",
@@ -291,7 +296,8 @@ export const translations = {
         biblio: "Bibliography References",
         // New Stats Labels
         calcMethod: "Calculation Method",
-        hypType: "Working Hypothesis",
+        hypType: "Hypothesis Type",
+        detailedHyp: "Hypothesis Statement",
         varType: "Primary Variable Type",
         confounders: "Confounders / Adjustment",
         effectSize: "Effect Size / NIM",
@@ -302,7 +308,7 @@ export const translations = {
       },
       placeholders: {
         title: "Ex: Study on...",
-        context: "Executive summary...",
+        context: "Executive summary with background...",
         obj: "Evaluate efficacy...",
         pop: "General characteristics...",
         method: "Consecutive patients...",
@@ -310,7 +316,8 @@ export const translations = {
         process: "Logistics and operations...",
         data: "eCRF, monitoring, cleaning...",
         biblio: "Paste your references here...",
-        confounders: "Age, sex, comorbidities..."
+        confounders: "Age, sex, comorbidities...",
+        detailedHyp: "Ex: Drug A is superior to B reducing variable X by Y units..."
       },
       statsOptions: {
         power: "Power-based (Classic)",
@@ -351,6 +358,7 @@ export const translations = {
       subjects: "subjects/physician",
       total: "Total:",
       stats: "Statistical Analysis",
+      hyp: "Hypothesis:",
       dev: "Development",
       data: "Data Management",
       dates: "Dates",
@@ -362,15 +370,15 @@ export const translations = {
       title: "User Manual",
       intro: "Quick guide to using Clinical Protocol Studio.",
       section1: "1. Idea Wizard",
-      text1: "Use the PICO format (Population, Intervention, Comparator, Outcome) to define your question. The system automatically selects the methodology (Clinical Trial vs Observational) based on your answers.",
-      section2: "2. Protocol Editor",
-      text2: "Navigate through tabs (General, Rationale, etc.) to fill in details. Fields marked with (*) are required.",
-      section3: "3. Artificial Intelligence (AI)",
-      text3: "Look for 'Magic Wand' or 'Robot' buttons. AI can: a) Write text from scratch (Generate), b) Improve your writing (Refine), c) Suggest inclusion/exclusion criteria or references.",
+      text1: "Use the PICO format to define your question. The system will auto-draft a formal hypothesis (Superiority/Non-Inferiority) for experimental studies, or association for observational ones.",
+      section2: "2. Reference Search (Context)",
+      text2: "In the 'General' tab, use the 'Research' button. AI will browse the web (PubMed/Medline) to write a justified context with real references.",
+      section3: "3. Hypothesis Formulation",
+      text3: "In the 'Statistics' tab, define your textual hypothesis (e.g., 'X is superior to Y by Z units'). This is critical for sample size calculation in trials.",
       section4: "4. Data Management",
-      text4: "You can save a draft locally in your browser ('Save') and retrieve it later ('Load'). Use 'Reset' to clear the form.",
+      text4: "Save drafts locally and load them later. Use 'Reset' to clear.",
       section5: "5. Language",
-      text5: "Switch between Spanish and English in the top bar. AI will generate content in the selected language."
+      text5: "Switch between Spanish and English. AI respects the chosen language for research and writing."
     }
   }
 };

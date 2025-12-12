@@ -59,6 +59,10 @@ export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
     let statsText = [""];
     let studyType = "Observacional";
     
+    // Hypothesis Drafting
+    let hypothesisText = "";
+    let hypType: ProtocolData['analysisHypothesis'] = 'exploratory';
+
     if (hasIntervention === 'yes') {
         // Experimental
         if (randomized) {
@@ -74,6 +78,13 @@ export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
             const groupCtrl = isEs ? "Grupo Control" : "Control Group";
             const placebo = isEs ? "Placebo o tratamiento estándar" : "Placebo or standard care";
             generatedData.interventions = `${groupInt}: ${pico.intervention}.\n${groupCtrl}: ${pico.comparison || placebo}.`;
+            
+            // Hypothesis Drafting for RCT
+            hypType = 'superiority';
+            hypothesisText = isEs
+                ? `El tratamiento con ${pico.intervention} es superior a ${pico.comparison || 'placebo'} en términos de mejorar ${pico.outcome} en la población seleccionada.`
+                : `Treatment with ${pico.intervention} is superior to ${pico.comparison || 'placebo'} in terms of improving ${pico.outcome} in the selected population.`;
+
         } else {
             designText = isEs 
                 ? "Estudio Cuasi-experimental (Ensayo no aleatorizado)."
@@ -83,6 +94,9 @@ export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
                 ? ["Comparación pre-post o entre grupos no equivalentes."]
                 : ["Pre-post comparison or non-equivalent groups."];
             generatedData.interventions = `${isEs ? 'Intervención' : 'Intervention'}: ${pico.intervention}.`;
+            hypothesisText = isEs
+                ? `La intervención ${pico.intervention} se asocia con cambios significativos en ${pico.outcome}.`
+                : `Intervention ${pico.intervention} is associated with significant changes in ${pico.outcome}.`;
         }
     } else {
         // Observational
@@ -94,6 +108,9 @@ export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
             statsText = isEs
                 ? ["Estadística descriptiva."]
                 : ["Descriptive statistics."];
+            hypothesisText = isEs 
+                ? "No se plantea hipótesis analítica formal (Estudio Descriptivo)."
+                : "No formal analytical hypothesis (Descriptive Study).";
         } else {
             // Analytical
             if (timeDirection === 'cross-sectional') {
@@ -127,12 +144,17 @@ export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
                  const cNon = isEs ? "Cohorte No Expuesta" : "Unexposed Cohort";
                  generatedData.selectionMethod = `${cExp}: ${pico.intervention}.\n${cNon}: ${isEs ? 'Sin' : 'No'} ${pico.intervention}.`;
             }
+             hypothesisText = isEs
+                ? `Existe una asociación significativa entre ${pico.intervention} y ${pico.outcome} en la población estudiada.`
+                : `There is a significant association between ${pico.intervention} and ${pico.outcome} in the studied population.`;
         }
     }
 
     generatedData.studyDesign = designText;
     generatedData.studyType = studyType;
     generatedData.statisticalAnalysis = statsText;
+    generatedData.analysisHypothesis = hypType;
+    generatedData.detailedHypothesis = hypothesisText;
 
     // 4. Objectives
     const improve = isEs ? 'mejora' : 'improves';

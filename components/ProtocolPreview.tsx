@@ -24,7 +24,7 @@ export const ProtocolPreview: React.FC<Props> = ({ data }) => {
         {data.contextSummary && (
           <div className="mb-6">
             <h2 className="font-bold text-base mb-2">Summary</h2>
-            <p className="text-justify italic bg-gray-50 p-2 rounded-md border border-gray-100">{data.contextSummary}</p>
+            <p className="text-justify italic bg-gray-50 p-2 rounded-md border border-gray-100 whitespace-pre-wrap">{data.contextSummary}</p>
             <hr className="border-black my-4" />
           </div>
         )}
@@ -143,6 +143,26 @@ export const ProtocolPreview: React.FC<Props> = ({ data }) => {
             <p className="mb-4 text-justify">
                 {data.sampleSizeJustification || '...'}
             </p>
+            
+            {(data.sampleSizeMethod === 'power' || data.sampleSizeMethod === 'precision') && data.statsParams && (
+                <div className="mb-4 text-sm bg-gray-50 p-3 rounded border border-gray-100">
+                    <p className="font-semibold mb-1">Parameters:</p>
+                    <ul className="list-disc pl-5 space-y-1">
+                        {data.sampleSizeMethod === 'power' && (
+                            <>
+                                <li>Alpha (Type I Error): {data.statsParams.alpha}</li>
+                                <li>Power (1-Beta): {data.statsParams.power}</li>
+                            </>
+                        )}
+                        {data.sampleSizeMethod === 'precision' && (
+                            <li>Precision/CI: {data.statsParams.precision}</li>
+                        )}
+                        {data.statsParams.deltaOrEffectSize && <li>Effect Size/Delta: {data.statsParams.deltaOrEffectSize}</li>}
+                        {data.statsParams.dropoutRate && <li>Expected Dropout: {data.statsParams.dropoutRate}</li>}
+                    </ul>
+                </div>
+            )}
+
             <p className="text-justify">
                 {t.preview.sampleText} <strong>{data.numPhysicians}</strong> {t.preview.physicians}, <strong>{data.subjectsPerPhysician}</strong> {t.preview.subjects}. {t.preview.total} <strong>{data.totalSubjects}</strong>.
             </p>
@@ -151,6 +171,15 @@ export const ProtocolPreview: React.FC<Props> = ({ data }) => {
 
          <div className="mb-6">
             <h2 className="font-bold text-base mb-2">{t.preview.stats}</h2>
+             
+             {/* Detailed Hypothesis Display */}
+             {data.detailedHypothesis && (
+                 <div className="mb-4">
+                     <p className="font-bold mb-1">{t.preview.hyp}</p>
+                     <p className="italic bg-gray-50 p-2 border border-gray-100 rounded text-sm text-justify">{data.detailedHypothesis}</p>
+                 </div>
+             )}
+
              <ul className="list-none space-y-2">
                  {data.statisticalAnalysis.map((stat, i) => (
                      <li key={i}><span className="font-bold">Obj {i + 1}.</span> {stat || '...'}</li>

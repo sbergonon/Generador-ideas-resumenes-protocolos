@@ -39,6 +39,7 @@ export const INITIAL_PROTOCOL_DATA: ProtocolData = {
   
   statisticalAnalysis: [''],
   analysisHypothesis: '',
+  detailedHypothesis: '',
   primaryVariableType: '',
   confounders: '',
 
