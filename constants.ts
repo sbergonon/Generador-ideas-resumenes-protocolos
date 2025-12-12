@@ -63,5 +63,6 @@ export const INITIAL_PROTOCOL_DATA: ProtocolData = {
   },
   proposedBy: '',
   proposalDate: new Date().toLocaleDateString(),
-  bibliography: ''
+  bibliography: '',
+  appendices: ''
 };

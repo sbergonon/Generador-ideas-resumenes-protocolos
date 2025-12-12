@@ -194,6 +194,33 @@ export const ProtocolPreview: React.FC<Props> = ({ data }) => {
             
             <h3 className="font-bold text-sm mb-2">{t.preview.data}</h3>
             <p className="text-justify whitespace-pre-wrap">{data.dataProcessing}</p>
+            
+            {/* Simple Table for Schedule */}
+            {data.schedule && (
+                 <div className="mt-4">
+                     <h3 className="font-bold text-sm mb-2">{t.form.labels.schedule}</h3>
+                     <table className="w-full text-sm border-collapse border border-gray-300">
+                         <tbody>
+                             {Object.entries(data.schedule).map(([key, val]) => (
+                                 val ? (
+                                     <tr key={key}>
+                                         <td className="border border-gray-300 p-1 font-semibold bg-gray-50 w-1/3">
+                                            {key === 'ethicsSubmission' && t.form.labels.ethSub}
+                                            {key === 'siteInitiation' && t.form.labels.siteInit}
+                                            {key === 'firstPatientIn' && t.form.labels.fpi}
+                                            {key === 'interimAnalysis' && t.form.labels.interim}
+                                            {key === 'lastPatientOut' && t.form.labels.lpo}
+                                            {key === 'dbLock' && t.form.labels.dbLock}
+                                            {key === 'finalReport' && t.form.labels.finalRep}
+                                         </td>
+                                         <td className="border border-gray-300 p-1">{val}</td>
+                                     </tr>
+                                 ) : null
+                             ))}
+                         </tbody>
+                     </table>
+                 </div>
+            )}
         </div>
         <hr className="border-black my-4" />
 
@@ -207,6 +234,17 @@ export const ProtocolPreview: React.FC<Props> = ({ data }) => {
              <h2 className="font-bold text-base mb-2">{t.preview.biblio}</h2>
              <p className="whitespace-pre-wrap">{data.bibliography}</p>
          </div>
+         <hr className="border-black my-4" />
+         
+         {/* Appendices Preview */}
+         {data.appendices && (
+             <div className="mb-6 break-before-page">
+                 <h2 className="font-bold text-base mb-4 uppercase text-center">{t.preview.appendices}</h2>
+                 <div className="whitespace-pre-wrap font-mono text-sm bg-gray-50 p-4 border border-gray-200">
+                     {data.appendices}
+                 </div>
+             </div>
+         )}
 
          <div className="mt-20 pt-4 border-t border-black flex justify-between text-xs text-gray-600">
             <span>{t.preview.docType}</span>

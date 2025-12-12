@@ -77,6 +77,7 @@ export interface ProtocolData {
   proposedBy: string;
   proposalDate: string;
   bibliography: string;
+  appendices: string; // New: For scales, images (text representation), etc.
 }
 
 export enum SectionTab {
@@ -87,7 +88,8 @@ export enum SectionTab {
   DESIGN = 'Design',
   STATS = 'Statistics',
   ADMIN = 'Admin',
-  BIBLIOGRAPHY = 'Bibliography'
+  BIBLIOGRAPHY = 'Bibliography',
+  APPENDICES = 'Appendices'
 }
 
 export type AppView = 'welcome' | 'wizard' | 'editor';

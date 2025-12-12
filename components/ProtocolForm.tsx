@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ProtocolData, SectionTab } from '../types';
-import { Plus, Trash2, Wand2, Loader2, ChevronRight, ChevronLeft, Sparkles, AlertCircle, Bot, Calculator, BarChart3, Microscope, Search, Filter, Calendar, Ruler } from 'lucide-react';
+import { Plus, Trash2, Wand2, Loader2, ChevronRight, ChevronLeft, Sparkles, AlertCircle, Bot, Calculator, BarChart3, Microscope, Search, Filter, Calendar, Ruler, Paperclip } from 'lucide-react';
 import { refineText, generateList, generateText, generateContextWithSearchAndRefs, generateTextWithRefs } from '../services/geminiService';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -80,6 +80,9 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
   const appendReferences = (newRefs: string) => {
       if (!newRefs || newRefs.length < 5) return;
       const currentBib = data.bibliography || '';
+      // Avoid exact duplicates if simple
+      if (currentBib.includes(newRefs)) return;
+      
       const separator = currentBib.length > 0 ? '\n\n' : '';
       handleChange('bibliography', currentBib + separator + newRefs);
   };
@@ -186,12 +189,15 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
         let specificity = "";
         
         // 1. Study Type Specificity
-        if (studyType.toLowerCase().includes('casos')) {
+        // Check safely for studyType
+        const safeStudyType = (studyType || '').toLowerCase();
+
+        if (safeStudyType.includes('casos')) {
              specificity += isInc 
                 ? "Define clearly the 'Case' condition (definitive diagnosis) and how 'Controls' are matched. " 
                 : "Exclude conditions that mimic the disease or prevent matching. ";
              if (data.isNested) specificity += "Must specify they belong to the parent cohort. ";
-        } else if (studyType.toLowerCase().includes('ensayo') || studyType.toLowerCase().includes('rct')) {
+        } else if (safeStudyType.includes('ensayo') || safeStudyType.includes('rct')) {
              specificity += isInc
                 ? "Include specific disease stage, informed consent capability, and safety parameters. "
                 : "Exclude contraindications to study drug, vulnerable populations, or comorbidities affecting safety. ";
@@ -202,7 +208,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
              if (data.controlType === 'placebo') {
                 specificity += !isInc ? "Exclude patients for whom placebo is unethical (severe untreated condition). " : "";
              }
-        } else if (studyType.toLowerCase().includes('cohort')) {
+        } else if (safeStudyType.includes('cohort')) {
             specificity += isInc ? "Subjects free of the outcome at baseline. " : "Pre-existing outcome condition. ";
         } else if (data.designModel === 'pre_post') {
             specificity += isInc ? "Subjects available for both baseline and follow-up assessments. " : "Subjects likely to be lost to follow-up. ";
@@ -810,7 +816,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                             </div>
                          
                          <div className="flex gap-4 pt-2 items-center">
-                              {data.studyType.toLowerCase().includes('casos') && (
+                              {(data.studyType || '').toLowerCase().includes('casos') && (
                                  <div className="flex items-center">
                                     <input
                                         id="nested-check"
@@ -1292,7 +1298,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                         <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.ethSub}</label>
                             <input
-                                type="text"
+                                type="date"
                                 value={data.schedule?.ethicsSubmission || ''}
                                 onChange={(e) => handleDeepChange('schedule', 'ethicsSubmission', e.target.value)}
                                 className="block w-full rounded-md border-gray-300 text-sm p-2"
@@ -1301,7 +1307,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                         <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.siteInit}</label>
                             <input
-                                type="text"
+                                type="date"
                                 value={data.schedule?.siteInitiation || ''}
                                 onChange={(e) => handleDeepChange('schedule', 'siteInitiation', e.target.value)}
                                 className="block w-full rounded-md border-gray-300 text-sm p-2"
@@ -1310,7 +1316,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                         <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.fpi}</label>
                             <input
-                                type="text"
+                                type="date"
                                 value={data.schedule?.firstPatientIn || ''}
                                 onChange={(e) => handleDeepChange('schedule', 'firstPatientIn', e.target.value)}
                                 className="block w-full rounded-md border-gray-300 text-sm p-2"
@@ -1319,7 +1325,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                          <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.interim}</label>
                             <input
-                                type="text"
+                                type="date"
                                 value={data.schedule?.interimAnalysis || ''}
                                 onChange={(e) => handleDeepChange('schedule', 'interimAnalysis', e.target.value)}
                                 className="block w-full rounded-md border-gray-300 text-sm p-2"
@@ -1328,7 +1334,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                         <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.lpo}</label>
                             <input
-                                type="text"
+                                type="date"
                                 value={data.schedule?.lastPatientOut || ''}
                                 onChange={(e) => handleDeepChange('schedule', 'lastPatientOut', e.target.value)}
                                 className="block w-full rounded-md border-gray-300 text-sm p-2"
@@ -1337,7 +1343,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                         <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.dbLock}</label>
                             <input
-                                type="text"
+                                type="date"
                                 value={data.schedule?.dbLock || ''}
                                 onChange={(e) => handleDeepChange('schedule', 'dbLock', e.target.value)}
                                 className="block w-full rounded-md border-gray-300 text-sm p-2"
@@ -1346,7 +1352,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                          <div className="md:col-span-2">
                             <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.finalRep}</label>
                             <input
-                                type="text"
+                                type="date"
                                 value={data.schedule?.finalReport || ''}
                                 onChange={(e) => handleDeepChange('schedule', 'finalReport', e.target.value)}
                                 className="block w-full rounded-md border-gray-300 text-sm p-2"
@@ -1389,6 +1395,44 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                  >
                     {loadingField === 'bibliography' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Wand2 className="w-3 h-3 mr-1" />}
                     Format (Vancouver)
+                 </button>
+              </div>
+            </div>
+          </div>
+        );
+
+      case SectionTab.APPENDICES:
+        return (
+          <div className="space-y-6 animate-fadeIn">
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                <Paperclip className="w-5 h-5 mr-2" />
+                {t.form.tabs.Appendices}
+            </h3>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4 text-sm text-yellow-800">
+                <p>Use this section to include the content of the measurement scales (e.g. depression scales), questionnaires, or informed consent templates.</p>
+            </div>
+            
+            <div className="relative">
+              <textarea
+                rows={15}
+                value={data.appendices}
+                onChange={(e) => handleChange('appendices', e.target.value)}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm border p-2 font-mono text-sm"
+                placeholder={t.form.placeholders.appendices}
+              />
+              <div className="absolute right-2 bottom-2 flex space-x-2">
+                 <button
+                    onClick={() => {
+                       const context = `Scales: ${data.measurementScales || 'No scales defined'}. Title: ${data.title}.`;
+                       const instruction = "Find and list the items/questions for the mentioned measurement scales. If standard (e.g. Hamilton, PHQ-9), transcribe the items. If not found, create a placeholder structure.";
+                       // Use generateTextWithRefs but we'll ignore refs here, mostly for search capability
+                       handleAIGenerateText('appendices', context, instruction);
+                    }}
+                    disabled={loadingField === 'appendices'}
+                    className="flex items-center px-3 py-1.5 text-xs font-medium text-medical-700 bg-medical-50 hover:bg-medical-100 border border-medical-200 rounded-md transition-colors"
+                 >
+                   {loadingField === 'appendices' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Search className="w-3 h-3 mr-1" />}
+                   Find Scales Content
                  </button>
               </div>
             </div>

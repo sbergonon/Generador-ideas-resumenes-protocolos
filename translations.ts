@@ -28,7 +28,7 @@ export const translations = {
       startBtn: "Comenzar Diseño Metodológico",
       manualBtn: "Leer Manual de Usuario",
       glossaryBtn: "Glosario de Términos",
-      version: "Versión 2.7 | Hypo-Gen | Advanced Methodological Core",
+      version: "Versión 2.8 | Hypo-Gen | Advanced Methodological Core",
     },
     wizard: {
       step1Title: "Definición PICO",
@@ -80,6 +80,7 @@ export const translations = {
         Statistics: "Estadística",
         Admin: "Logística",
         Bibliography: "Bibliografía",
+        Appendices: "Anexos",
       },
       aiRefine: "Mejorar redacción",
       aiGenerate: "Generar (+Biblio)",
@@ -123,6 +124,7 @@ export const translations = {
         dataProc: "Procesamiento de Datos",
         location: "Investigadores y Localización",
         biblio: "Referencias Bibliográficas",
+        appendices: "Anexos y Escalas",
         schedule: "Cronograma del Estudio",
         // Schedule Labels
         ethSub: "Envío CEIC/IRB",
@@ -158,6 +160,7 @@ export const translations = {
         process: "Logística y operativa...",
         data: "CRD, monitorización, limpieza...",
         biblio: "Pegue aquí sus referencias...",
+        appendices: "Pegue aquí el contenido de las escalas, cuestionarios o documentos anexos...",
         confounders: "Edad, sexo, comorbilidades...",
         detailedHyp: "Ej: El fármaco A es superior al B reduciendo la variable X en Y unidades..."
       },
@@ -219,7 +222,8 @@ export const translations = {
       dates: "Cronograma",
       proposedBy: "Propuesto por:",
       date: "Fecha:",
-      biblio: "Bibliografía"
+      biblio: "Bibliografía",
+      appendices: "Anexos"
     },
     manual: {
       title: "Manual de Usuario Avanzado",
@@ -228,10 +232,10 @@ export const translations = {
       text1: "Utilice el formato PICO. El sistema ahora soporta diseños complejos: Ensayos Cruzados (Crossover), Comparadores Activos y Estudios Anidados (Nested Case-Control).",
       section2: "2. Búsqueda de Referencias (Contexto)",
       text2: "Use 'Investigar (+Biblio)'. La IA generará el texto con citas numéricas (ej. [1]) y añadirá automáticamente las referencias completas a la pestaña 'Bibliografía'.",
-      section3: "3. Formulación de Hipótesis y Escalas",
-      text3: "Defina las escalas de medición (ej. Psiquiatría) en la pestaña 'Objetivos'. En 'Estadística', defina la hipótesis y el tamaño muestral. La calculadora ajusta el Total de sujetos y luego distribuye por centros.",
+      section3: "3. Hipótesis, Escalas y Anexos",
+      text3: "Defina las escalas en 'Objetivos'. En 'Anexos', puede pedir a la IA que busque y transcriba el contenido de dichas escalas (ej. ítems del Hamilton).",
       section4: "4. Diseño y Cronograma",
-      text4: "Indique la duración del seguimiento. En 'Logística', complete el Cronograma (FPI, LPO, Informe Final).",
+      text4: "Seleccione fechas en el calendario del Cronograma. El diseño soporta estudios Pre-Post y cálculo de muestra adaptado.",
       section5: "5. Idioma",
       text5: "Cambie entre Español e Inglés. La IA respetará el idioma seleccionado para la búsqueda y redacción."
     },
@@ -285,7 +289,7 @@ export const translations = {
       startBtn: "Start Methodological Design",
       manualBtn: "Read User Manual",
       glossaryBtn: "Research Glossary",
-      version: "Version 2.7 | Hypo-Gen | Advanced Methodological Core",
+      version: "Version 2.8 | Hypo-Gen | Advanced Methodological Core",
     },
     wizard: {
       step1Title: "PICO Definition",
@@ -337,6 +341,7 @@ export const translations = {
         Statistics: "Statistics",
         Admin: "Logistics",
         Bibliography: "Bibliography",
+        Appendices: "Appendices",
       },
       aiRefine: "Refine with AI",
       aiGenerate: "Generate (+Biblio)",
@@ -380,6 +385,7 @@ export const translations = {
         dataProc: "Data Processing",
         location: "Investigators & Location",
         biblio: "Bibliography References",
+        appendices: "Appendices & Scales",
         schedule: "Study Schedule",
         // Schedule Labels
         ethSub: "Ethics Submission",
@@ -415,6 +421,7 @@ export const translations = {
         process: "Logistics and operations...",
         data: "eCRF, monitoring, cleaning...",
         biblio: "Paste your references here...",
+        appendices: "Paste content of scales, questionnaires or annex documents here...",
         confounders: "Age, sex, comorbidities...",
         detailedHyp: "Ex: Drug A is superior to B reducing variable X by Y units..."
       },
@@ -476,7 +483,8 @@ export const translations = {
       dates: "Schedule",
       proposedBy: "Proposed by:",
       date: "Date:",
-      biblio: "Bibliography"
+      biblio: "Bibliography",
+      appendices: "Appendices"
     },
     manual: {
       title: "Advanced User Manual",
@@ -485,10 +493,10 @@ export const translations = {
       text1: "Use the PICO format. The system now supports complex designs: Crossover Trials, Active Comparators, and Nested Case-Control studies.",
       section2: "2. Reference Search (Context)",
       text2: "Use 'Research (+Biblio)'. AI will generate text with numeric citations (e.g. [1]) and automatically append full references to the 'Bibliography' tab.",
-      section3: "3. Hypothesis & Scales",
-      text3: "Define measurement scales (e.g. Psychiatry) in 'Objectives'. In 'Statistics', define hypothesis and sample size. The calculator adjusts Total subjects and then distributes per site.",
+      section3: "3. Hypothesis, Scales & Appendices",
+      text3: "Define scales in 'Objectives'. In 'Appendices', ask AI to find and transcribe scale content (e.g., Hamilton items).",
       section4: "4. Design & Schedule",
-      text4: "Indicate Follow-up duration. In 'Logistics', fill in the Schedule (FPI, LPO, Final Report).",
+      text4: "Use date pickers in Schedule. Design supports Pre-Post and adapted sample size calculation.",
       section5: "5. Language",
       text5: "Switch between Spanish and English. AI respects the chosen language for research and writing."
     },

@@ -145,6 +145,34 @@ export interface GeneratedContentWithRefs {
   references: string;
 }
 
+// Helper to separate text from references
+const extractReferences = (fullText: string): GeneratedContentWithRefs => {
+    // Attempt to split by common delimiters used by the model
+    const splitters = [
+        '### REFERENCES ###',
+        '### References ###',
+        '### Referencias ###',
+        '**References**',
+        '**Referencias**',
+        'References:',
+        'Referencias:'
+    ];
+
+    for (const splitter of splitters) {
+        if (fullText.includes(splitter)) {
+            const parts = fullText.split(splitter);
+            // The last part is likely the references, everything before is text
+            if (parts.length > 1) {
+                const references = parts.pop()?.trim() || "";
+                const text = parts.join(splitter).trim(); // Rejoin in case splitter appeared earlier (unlikely but safe)
+                return { text, references };
+            }
+        }
+    }
+
+    return { text: fullText, references: "" };
+}
+
 // New function for context with search grounding AND separation of references
 export const generateContextWithSearchAndRefs = async (title: string, objective: string, lang: Language): Promise<GeneratedContentWithRefs> => {
   if (!apiKey) {
@@ -154,8 +182,8 @@ export const generateContextWithSearchAndRefs = async (title: string, objective:
   try {
     const model = 'gemini-2.5-flash'; 
     const langInstruction = lang === 'es' 
-      ? "Escribe en Español. Usa referencias numéricas en el texto [1], [2]. Al final, añade una sección '### REFERENCES ###' con la bibliografía completa en estilo Vancouver." 
-      : "Write in English. Use numeric citations in text [1], [2]. At the end, add a section '### REFERENCES ###' with the full bibliography in Vancouver style.";
+      ? "Escribe en Español. Usa referencias numéricas en el texto [1], [2]. IMPORTANTE: Al final, añade una sección estricta '### REFERENCES ###' con la bibliografía." 
+      : "Write in English. Use numeric citations in text [1], [2]. IMPORTANT: At the end, add a strict section '### REFERENCES ###' with the bibliography.";
 
     const prompt = `
       You are a clinical research expert performing a literature review.
@@ -169,7 +197,7 @@ export const generateContextWithSearchAndRefs = async (title: string, objective:
       2. Explain the current gap in knowledge or the need for this specific study (Rationale).
       3. Use Google Search to find relevant, real, and recent medical literature (Pubmed/Medline sources preferred).
       4. Cite these sources in the text using numbers [1], [2]...
-      5. List the full references at the bottom after the delimiter '### REFERENCES ###'.
+      5. List the full references at the bottom explicitly separated by '### REFERENCES ###'.
       6. ${langInstruction}
     `;
 
@@ -182,18 +210,7 @@ export const generateContextWithSearchAndRefs = async (title: string, objective:
     });
 
     let fullText = response.text?.trim() || '';
-    
-    // Split text and references
-    const parts = fullText.split('### REFERENCES ###');
-    
-    if (parts.length > 1) {
-        return {
-            text: parts[0].trim(),
-            references: parts[1].trim()
-        };
-    }
-
-    return { text: fullText, references: "" };
+    return extractReferences(fullText);
 
   } catch (error) {
     console.error("Gemini API Error (Search):", error);
@@ -208,8 +225,8 @@ export const generateTextWithRefs = async (context: string, instruction: string,
   try {
     const model = 'gemini-2.5-flash';
     const langInstruction = lang === 'es' 
-      ? "Responde en Español. Si usas datos específicos, cita [1] y lista al final bajo '### REFERENCES ###'." 
-      : "Respond in English. If using specific facts, cite [1] and list at the end under '### REFERENCES ###'.";
+      ? "Responde en Español. Si usas datos específicos, cita [1]. IMPORTANTE: Pon la lista completa al final bajo el separador '### REFERENCES ###'." 
+      : "Respond in English. If using specific facts, cite [1]. IMPORTANT: Put the full list at the end under the separator '### REFERENCES ###'.";
 
     const prompt = `
       Act as an expert clinical research methodologist.
@@ -221,8 +238,9 @@ export const generateTextWithRefs = async (context: string, instruction: string,
       
       Output Format:
       [Main Text Body]
+      
       ### REFERENCES ###
-      [List of References in Vancouver Style if applicable, otherwise leave empty]
+      [List of References in Vancouver Style if applicable]
     `;
 
     const response = await ai.models.generateContent({
@@ -231,15 +249,7 @@ export const generateTextWithRefs = async (context: string, instruction: string,
     });
 
     let fullText = response.text?.trim() || '';
-    const parts = fullText.split('### REFERENCES ###');
-    
-    if (parts.length > 1) {
-        return {
-            text: parts[0].trim(),
-            references: parts[1].trim()
-        };
-    }
-    return { text: fullText, references: "" };
+    return extractReferences(fullText);
 
   } catch (error) {
     return { text: "", references: "" };
