@@ -22,8 +22,11 @@ export interface ProtocolData {
   exclusionCriteria: string[];
   
   // Design & Interventions
-  studyType: string;
-  studyDesign: string;
+  studyType: string; // Broad category (RCT, Cohort, etc.)
+  studyDesign: string; // Full text description
+  designModel: 'parallel' | 'crossover' | 'single_group' | 'factorial' | ''; // New: Specific model
+  controlType: 'placebo' | 'active' | 'historical' | 'none' | ''; // New: Type of control
+  isNested: boolean; // New: For nested case-control
   interventions: string;
   
   // Evaluations

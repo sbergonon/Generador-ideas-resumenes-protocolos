@@ -1,13 +1,14 @@
 import React from 'react';
-import { FileText, ArrowRight, AlertCircle, Book } from 'lucide-react';
+import { FileText, ArrowRight, AlertCircle, Book, BookOpen } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface Props {
   onStart: () => void;
   onOpenManual: () => void;
+  onOpenGlossary: () => void;
 }
 
-export const WelcomeScreen: React.FC<Props> = ({ onStart, onOpenManual }) => {
+export const WelcomeScreen: React.FC<Props> = ({ onStart, onOpenManual, onOpenGlossary }) => {
   const { t } = useLanguage();
 
   return (
@@ -50,7 +51,7 @@ export const WelcomeScreen: React.FC<Props> = ({ onStart, onOpenManual }) => {
             </div>
           </div>
 
-          <div className="pt-4 flex flex-col items-center space-y-4">
+          <div className="pt-4 flex flex-col items-center space-y-3">
             <button
               onClick={onStart}
               className="w-full flex items-center justify-center px-8 py-4 border border-transparent text-lg font-medium rounded-xl text-white bg-medical-600 hover:bg-medical-700 md:text-xl transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
@@ -59,13 +60,23 @@ export const WelcomeScreen: React.FC<Props> = ({ onStart, onOpenManual }) => {
               <ArrowRight className="ml-2 w-6 h-6" />
             </button>
             
-            <button
-              onClick={onOpenManual}
-              className="text-sm text-medical-600 hover:text-medical-800 flex items-center justify-center font-medium transition-colors py-2"
-            >
-               <Book className="w-4 h-4 mr-2" />
-               {t.welcome.manualBtn}
-            </button>
+            <div className="flex space-x-4">
+                <button
+                  onClick={onOpenManual}
+                  className="text-sm text-medical-600 hover:text-medical-800 flex items-center justify-center font-medium transition-colors py-2"
+                >
+                   <Book className="w-4 h-4 mr-2" />
+                   {t.welcome.manualBtn}
+                </button>
+                
+                 <button
+                  onClick={onOpenGlossary}
+                  className="text-sm text-medical-600 hover:text-medical-800 flex items-center justify-center font-medium transition-colors py-2"
+                >
+                   <BookOpen className="w-4 h-4 mr-2" />
+                   {t.welcome.glossaryBtn}
+                </button>
+            </div>
           </div>
         </div>
         

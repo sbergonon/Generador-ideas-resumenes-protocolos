@@ -5,15 +5,17 @@ import { WelcomeScreen } from './components/WelcomeScreen';
 import { IdeaGenerator } from './components/IdeaGenerator';
 import { ProtocolData, AppView } from './types';
 import { INITIAL_PROTOCOL_DATA } from './constants';
-import { FileText, PenTool, LayoutTemplate, Save, FolderOpen, RotateCcw, Book, Globe } from 'lucide-react';
+import { FileText, PenTool, LayoutTemplate, Save, FolderOpen, RotateCcw, Book, Globe, Home, BookOpen } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { UserManualModal } from './components/UserManualModal';
+import { GlossaryModal } from './components/GlossaryModal';
 
 const MainApp: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
   const [view, setView] = useState<AppView>('welcome');
   const [protocolData, setProtocolData] = useState<ProtocolData>(INITIAL_PROTOCOL_DATA);
   const [isManualOpen, setIsManualOpen] = useState(false);
+  const [isGlossaryOpen, setIsGlossaryOpen] = useState(false);
 
   const handleIdeaGenerated = (data: ProtocolData) => {
     setProtocolData(data);
@@ -52,6 +54,12 @@ const MainApp: React.FC = () => {
       setProtocolData(INITIAL_PROTOCOL_DATA);
     }
   };
+  
+  const handleGoHome = () => {
+     if (window.confirm(t.app.confirmHome)) {
+         setView('welcome');
+     }
+  };
 
   const toggleLanguage = () => {
     setLanguage(language === 'es' ? 'en' : 'es');
@@ -61,9 +69,11 @@ const MainApp: React.FC = () => {
     return (
       <div className="relative">
         <UserManualModal isOpen={isManualOpen} onClose={() => setIsManualOpen(false)} />
+        <GlossaryModal isOpen={isGlossaryOpen} onClose={() => setIsGlossaryOpen(false)} />
         <WelcomeScreen 
             onStart={() => setView('wizard')} 
             onOpenManual={() => setIsManualOpen(true)}
+            onOpenGlossary={() => setIsGlossaryOpen(true)}
         />
         <div className="absolute top-4 right-4 flex space-x-2">
             <button
@@ -89,6 +99,16 @@ const MainApp: React.FC = () => {
     return (
       <>
         <UserManualModal isOpen={isManualOpen} onClose={() => setIsManualOpen(false)} />
+        <GlossaryModal isOpen={isGlossaryOpen} onClose={() => setIsGlossaryOpen(false)} />
+        <div className="absolute top-4 left-4 z-50">
+             <button
+                onClick={handleGoHome}
+                className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 shadow-sm"
+              >
+                <Home className="w-4 h-4 mr-2" />
+                {t.wizard.home}
+            </button>
+        </div>
         <div className="absolute top-4 right-4 z-50">
            <button
                 onClick={toggleLanguage}
@@ -106,11 +126,12 @@ const MainApp: React.FC = () => {
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <UserManualModal isOpen={isManualOpen} onClose={() => setIsManualOpen(false)} />
+      <GlossaryModal isOpen={isGlossaryOpen} onClose={() => setIsGlossaryOpen(false)} />
       
       {/* App Header */}
       <header className="bg-medical-900 text-white p-4 shadow-md z-10 flex justify-between items-center">
-        <div className="flex items-center space-x-3">
-          <div className="bg-white p-2 rounded-lg text-medical-900">
+        <div className="flex items-center space-x-3 cursor-pointer group" onClick={handleGoHome} title={t.app.home}>
+          <div className="bg-white p-2 rounded-lg text-medical-900 group-hover:bg-medical-50 transition-colors">
             <FileText className="w-6 h-6" />
           </div>
           <div>
@@ -126,6 +147,14 @@ const MainApp: React.FC = () => {
                 title="Switch Language"
             >
                 {language === 'es' ? 'EN' : 'ES'}
+            </button>
+             <button 
+                onClick={() => setIsGlossaryOpen(true)}
+                className="flex items-center text-sm bg-medical-800 hover:bg-medical-700 px-3 py-2 rounded-md transition-colors border border-medical-700"
+                title={t.app.glossary}
+            >
+                <BookOpen className="w-4 h-4 mr-2" />
+                {t.app.glossary}
             </button>
             <button 
                 onClick={() => setIsManualOpen(true)}

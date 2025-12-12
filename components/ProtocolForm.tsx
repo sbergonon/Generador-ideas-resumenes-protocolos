@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ProtocolData, SectionTab } from '../types';
-import { Plus, Trash2, Wand2, Loader2, ChevronRight, ChevronLeft, Sparkles, AlertCircle, Bot, Calculator, BarChart3, Microscope, Search } from 'lucide-react';
+import { Plus, Trash2, Wand2, Loader2, ChevronRight, ChevronLeft, Sparkles, AlertCircle, Bot, Calculator, BarChart3, Microscope, Search, Filter } from 'lucide-react';
 import { refineText, generateList, generateText, generateContextWithSearch } from '../services/geminiService';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -114,28 +114,77 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
     setLoadingField(null);
   };
 
-  const handleAIGenerateList = async (field: 'inclusionCriteria' | 'exclusionCriteria' | 'statisticalAnalysis') => {
+  const handleAIGenerateList = async (field: 'inclusionCriteria' | 'exclusionCriteria' | 'statisticalAnalysis' | 'secondaryObjectives') => {
     setLoadingField(field);
     
     let typeLabel = '';
     let context = '';
 
     if (field === 'statisticalAnalysis') {
-        typeLabel = 'technical statistical analysis steps';
+        typeLabel = 'technical statistical analysis steps (Descriptive, Inferential, and Modeling)';
         context = `
-          Title: ${data.title}
-          Design: ${data.studyType}
-          Primary Objective: ${data.primaryObjective}
-          Hypothesis: ${data.analysisHypothesis}
-          Primary Variable: ${data.primaryVariableType}
-          Confounders: ${data.confounders}
+          Study Title: ${data.title}
+          Study Design: ${data.studyType}
+          Design Model: ${data.designModel || 'standard'}
+          Control Type: ${data.controlType || 'N/A'}
+          Detailed Hypothesis: ${data.detailedHypothesis}
+          
+          PICO Elements:
+          - Population: ${data.populationDescription}
+          - Intervention/Exposure: ${data.interventions}
+          - Primary Outcome/Variable: ${data.evaluationsPrimary || data.primaryObjective}
+          
+          Variable Type: ${data.primaryVariableType}
+          Confounders/Adjustment Variables: ${data.confounders}
+          Analysis Approach: ${data.analysisHypothesis} (e.g. superiority, non-inferiority)
         `;
-    } else {
-        typeLabel = field === 'inclusionCriteria' ? 'technical inclusion criteria' : 'technical exclusion criteria';
+    } else if (field === 'secondaryObjectives') {
+        typeLabel = 'secondary objectives (SMART criteria)';
         context = `
           Title: ${data.title}
-          Study Type: ${data.studyType}
-          Population: ${data.populationDescription || data.selectionMethod}
+          Primary Objective: ${data.primaryObjective}
+          Design: ${data.studyType}
+        `;
+    } else if (field === 'inclusionCriteria' || field === 'exclusionCriteria') {
+        // Enhanced logic for Inclusion/Exclusion based on Study Type and advanced design parameters
+        const studyType = data.studyType || 'Observacional';
+        const isInc = field === 'inclusionCriteria';
+        
+        let specificity = "";
+        
+        // 1. Study Type Specificity
+        if (studyType.toLowerCase().includes('casos')) {
+             specificity += isInc 
+                ? "Define clearly the 'Case' condition (definitive diagnosis) and how 'Controls' are matched. " 
+                : "Exclude conditions that mimic the disease or prevent matching. ";
+             if (data.isNested) specificity += "Must specify they belong to the parent cohort. ";
+        } else if (studyType.toLowerCase().includes('ensayo') || studyType.toLowerCase().includes('rct')) {
+             specificity += isInc
+                ? "Include specific disease stage, informed consent capability, and safety parameters. "
+                : "Exclude contraindications to study drug, vulnerable populations, or comorbidities affecting safety. ";
+             
+             if (data.designModel === 'crossover') {
+                specificity += isInc ? "Patients must have stable disease suitable for washout periods. " : "Exclude patients with rapidly progressive disease. ";
+             }
+             if (data.controlType === 'placebo') {
+                specificity += !isInc ? "Exclude patients for whom placebo is unethical (severe untreated condition). " : "";
+             }
+        } else if (studyType.toLowerCase().includes('cohort')) {
+            specificity += isInc ? "Subjects free of the outcome at baseline. " : "Pre-existing outcome condition. ";
+        }
+
+        typeLabel = isInc 
+            ? `technical inclusion criteria specifically for a ${studyType} study. ${specificity}`
+            : `technical exclusion criteria specifically for a ${studyType} study. ${specificity}`;
+
+        context = `
+          Title: ${data.title}
+          Study Type: ${studyType}
+          Design Model: ${data.designModel || 'N/A'}
+          Control Type: ${data.controlType || 'N/A'}
+          Is Nested: ${data.isNested ? 'Yes' : 'No'}
+          Population Description: ${data.populationDescription}
+          Selection Method: ${data.selectionMethod}
           Primary Objective: ${data.primaryObjective}
         `;
     }
@@ -157,21 +206,118 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
       Design Description: ${data.studyDesign}
       Primary Objective: ${data.primaryObjective}
     `;
-    const instruction = "Classify the study methodology into exactly one of these categories: 'Ensayo Clínico Aleatorizado', 'Estudio de Cohortes', 'Estudio de Casos y Controles', 'Estudio Transversal', 'Estudio Descriptivo'. Return only the category name.";
+    const instruction = "Classify the study methodology into exactly one of these categories: 'Ensayo Clínico Aleatorizado', 'Estudio de Cohortes', 'Estudio de Casos y Controles', 'Estudio Transversal', 'Estudio Descriptivo', 'Cuasi-experimental', 'Observacional'. Return only the category name.";
     
     const result = await generateText(context, instruction, language);
-    // Sanitize result to match options approximately
+    
     if (result) {
         let bestMatch = result;
-        if (result.toLowerCase().includes('ensayo') || result.toLowerCase().includes('rct')) bestMatch = 'Ensayo Clínico Aleatorizado';
-        else if (result.toLowerCase().includes('cohort')) bestMatch = 'Estudio de Cohortes';
-        else if (result.toLowerCase().includes('casos')) bestMatch = 'Estudio de Casos y Controles';
-        else if (result.toLowerCase().includes('transversal')) bestMatch = 'Estudio Transversal';
-        else if (result.toLowerCase().includes('descriptivo')) bestMatch = 'Estudio Descriptivo';
+        const lower = result.toLowerCase();
+        
+        if (lower.includes('ensayo') || lower.includes('rct') || lower.includes('randomized')) bestMatch = 'Ensayo Clínico Aleatorizado';
+        else if (lower.includes('cohort')) bestMatch = 'Estudio de Cohortes';
+        else if (lower.includes('casos') || lower.includes('case')) bestMatch = 'Estudio de Casos y Controles';
+        else if (lower.includes('transversal') || lower.includes('cross')) bestMatch = 'Estudio Transversal';
+        else if (lower.includes('descriptivo') || lower.includes('descriptive')) bestMatch = 'Estudio Descriptivo';
+        else if (lower.includes('cuasi') || lower.includes('quasi')) bestMatch = 'Cuasi-experimental';
+        else if (lower.includes('observacional') || lower.includes('observational')) bestMatch = 'Observacional';
         
         handleChange('studyType', bestMatch);
     }
     setLoadingField(null);
+  };
+
+  // Z-Score lookup for Two-Sided Alpha
+  const getZScoreAlpha = (alpha: number) => {
+    if (alpha <= 0.001) return 3.291;
+    if (alpha <= 0.01) return 2.576;
+    if (alpha <= 0.05) return 1.960;
+    if (alpha <= 0.10) return 1.645;
+    return 1.960; // default 0.05
+  };
+
+  // Z-Score lookup for Power (1 - Beta)
+  const getZScoreBeta = (power: number) => {
+    if (power >= 0.99) return 2.326;
+    if (power >= 0.95) return 1.645;
+    if (power >= 0.90) return 1.282;
+    if (power >= 0.85) return 1.036;
+    if (power >= 0.80) return 0.842;
+    return 0.842; // default 0.80
+  };
+
+  const handleCalculateSampleSize = () => {
+    const params = data.statsParams || {};
+    
+    // 1. Parse Parameters
+    let alpha = parseFloat(params.alpha);
+    if (isNaN(alpha)) alpha = 0.05;
+
+    let power = parseFloat(params.power);
+    if (isNaN(power)) power = 0.80;
+    
+    // Parse standardized effect size (Cohen's d)
+    const esText = params.deltaOrEffectSize || '';
+    const esMatch = esText.match(/[0-9]*\.?[0-9]+/); // Extracts first number
+    const effectSize = esMatch ? parseFloat(esMatch[0]) : 0;
+
+    // Parse dropout
+    const dropText = params.dropoutRate || '';
+    const dropMatch = dropText.match(/[0-9]*\.?[0-9]+/);
+    let dropout = dropMatch ? parseFloat(dropMatch[0]) : 0;
+    
+    // Handle % inputs for dropout
+    if (dropout > 1) {
+       dropout = dropout / 100;
+    }
+
+    // 2. Validation
+    if (!effectSize || effectSize <= 0) {
+        alert(language === 'es' 
+            ? "Por favor ingrese un Tamaño del Efecto válido (ej. 0.5 para Cohen's d)." 
+            : "Please enter a valid Effect Size (e.g. 0.5 for Cohen's d).");
+        return;
+    }
+
+    // 3. Calculation (Lehr's Formula / Two-sample t-test approx)
+    const zAlpha = getZScoreAlpha(alpha);
+    const zBeta = getZScoreBeta(power);
+
+    // Formula: N_per_group = 2 * ((Z_alpha + Z_beta) / effectSize)^2
+    const nPerGroup = 2 * Math.pow((zAlpha + zBeta) / effectSize, 2);
+    let total = Math.ceil(nPerGroup * 2);
+
+    // 4. Adjust for Dropout
+    if (dropout > 0 && dropout < 1) {
+        total = Math.ceil(total / (1 - dropout));
+    }
+
+    handleChange('totalSubjects', total.toString());
+    
+    // 5. Auto-distribute if sites are set
+    const nPhys = parseInt(data.numPhysicians);
+    if (!isNaN(nPhys) && nPhys > 0) {
+        const perSite = Math.ceil(total / nPhys);
+        handleChange('subjectsPerPhysician', perSite.toString());
+    }
+  };
+
+  const samplingStrategies = [
+    { value: "Muestreo Consecutivo (Consecutive Sampling)", label: "Consecutive / Consecutivo" },
+    { value: "Muestreo Aleatorio Simple (Simple Random Sampling)", label: "Simple Random / Aleatorio Simple" },
+    { value: "Muestreo por Conveniencia (Convenience Sampling)", label: "Convenience / Conveniencia" },
+    { value: "Muestreo Estratificado (Stratified Sampling)", label: "Stratified / Estratificado" },
+    { value: "Muestreo Sistemático (Systematic Sampling)", label: "Systematic / Sistemático" },
+    { value: "Muestreo por Conglomerados (Cluster Sampling)", label: "Cluster / Conglomerados" }
+  ];
+
+  const handleSamplingStrategyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const val = e.target.value;
+      if (!val) return;
+      
+      const current = data.selectionMethod;
+      const newValue = current && current.trim() !== '' ? `${current}\n${val}` : val;
+      handleChange('selectionMethod', newValue);
   };
 
   const tabs = Object.values(SectionTab);
@@ -286,9 +432,26 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                 rows={5}
                 value={data.rationalePrimary}
                 onChange={(e) => handleChange('rationalePrimary', e.target.value)}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm border p-2"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm border p-2 pb-8"
+                placeholder={language === 'es' ? "Explique la justificación científica del objetivo principal..." : "Explain the scientific rationale for the primary objective..."}
               />
-              {renderAIButton('rationalePrimary', data.rationalePrimary, 'Scientific rationale for primary objective')}
+              <button
+                onClick={() => {
+                  const context = `Study Title: ${data.title}. Background Context: ${data.contextSummary}. Primary Objective: ${data.primaryObjective}.`;
+                  const instruction = "Write a formal scientific rationale justifying the primary objective. Connect the rationale explicitly to the study's objectives and the provided context. If the context summary is brief or missing, use the Title and Primary Objective to infer and suggest a detailed scientific gap or clinical relevance that justifies this study, referencing standard existing knowledge or limitations in the field.";
+                  
+                  if (data.rationalePrimary && data.rationalePrimary.length > 10) {
+                    handleAIRefine('rationalePrimary', data.rationalePrimary, `${instruction} Context: ${context}`);
+                  } else {
+                    handleAIGenerateText('rationalePrimary', context, instruction);
+                  }
+                }}
+                disabled={loadingField === 'rationalePrimary'}
+                className="absolute right-2 bottom-2 bg-medical-50 text-medical-700 hover:bg-medical-100 px-3 py-1 rounded-md text-xs font-medium flex items-center transition-colors shadow-sm border border-medical-200"
+              >
+                {loadingField === 'rationalePrimary' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                {data.rationalePrimary ? t.form.aiRefine : t.form.aiGenerate}
+              </button>
             </div>
 
             <div className="relative">
@@ -297,9 +460,26 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                 rows={4}
                 value={data.rationaleSecondary}
                 onChange={(e) => handleChange('rationaleSecondary', e.target.value)}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm border p-2"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm border p-2 pb-8"
+                placeholder={language === 'es' ? "Explique la justificación de los objetivos secundarios..." : "Explain the rationale for secondary objectives..."}
               />
-               {renderAIButton('rationaleSecondary', data.rationaleSecondary, 'Scientific rationale for secondary objectives')}
+               <button
+                onClick={() => {
+                  const context = `Study Title: ${data.title}. Background Context: ${data.contextSummary}. Primary Objective: ${data.primaryObjective}. Secondary Objectives: ${data.secondaryObjectives.filter(o => o).join(', ')}.`;
+                  const instruction = "Write a scientific rationale for the secondary objectives of this study. Explain why these additional endpoints are relevant and how they complement the primary objective, referencing the study context. If context is limited, infer the clinical relevance of these secondary endpoints based on the Title and Primary Objective.";
+                  
+                  if (data.rationaleSecondary && data.rationaleSecondary.length > 10) {
+                    handleAIRefine('rationaleSecondary', data.rationaleSecondary, `${instruction} Context: ${context}`);
+                  } else {
+                    handleAIGenerateText('rationaleSecondary', context, instruction);
+                  }
+                }}
+                disabled={loadingField === 'rationaleSecondary'}
+                className="absolute right-2 bottom-2 bg-medical-50 text-medical-700 hover:bg-medical-100 px-3 py-1 rounded-md text-xs font-medium flex items-center transition-colors shadow-sm border border-medical-200"
+              >
+                {loadingField === 'rationaleSecondary' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                {data.rationaleSecondary ? t.form.aiRefine : t.form.aiGenerate}
+              </button>
             </div>
           </div>
         );
@@ -320,26 +500,63 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                     placeholder={t.form.placeholders.obj}
                 />
                 <ErrorMessage field="primaryObjective" />
-                {renderAIButton('primaryObjective', data.primaryObjective, 'Formal primary objective definition')}
+                
+                <button
+                  onClick={() => {
+                     const context = `Title: ${data.title}. Study Design: ${data.studyDesign}. Population: ${data.populationDescription}.`;
+                     const instruction = "Rewrite the Primary Objective to be SMART (Specific, Measurable, Achievable, Relevant, Time-bound). Clearly state the population, intervention/exposure, comparator (if applicable), and outcome.";
+                     handleAIRefine('primaryObjective', data.primaryObjective, `${instruction} Context: ${context}`);
+                  }}
+                  disabled={!data.primaryObjective || loadingField === 'primaryObjective'}
+                  className="absolute right-2 bottom-2 bg-medical-50 text-medical-700 hover:bg-medical-100 px-3 py-1 rounded-md text-xs font-medium flex items-center transition-colors shadow-sm border border-medical-200"
+                >
+                   {loadingField === 'primaryObjective' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                   {t.form.aiRefine} (SMART)
+                </button>
              </div>
 
              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t.form.labels.objSecondary}</label>
+                <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-medium text-gray-700">{t.form.labels.objSecondary}</label>
+                     <button
+                          onClick={() => handleAIGenerateList('secondaryObjectives')}
+                          disabled={loadingField === 'secondaryObjectives'}
+                          className="flex items-center px-3 py-1.5 text-xs font-medium text-medical-700 bg-medical-50 hover:bg-medical-100 border border-medical-200 rounded-full transition-colors"
+                        >
+                          {loadingField === 'secondaryObjectives' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Bot className="w-3 h-3 mr-1" />}
+                          {t.form.aiSuggest}
+                        </button>
+                </div>
+
                 {data.secondaryObjectives.map((obj, idx) => (
-                    <div key={idx} className="flex gap-2 mb-2">
+                    <div key={idx} className="flex gap-2 mb-2 relative">
                         <span className="pt-2 text-gray-500 font-mono">{idx + 1}.</span>
-                        <input
-                            type="text"
-                            value={obj}
-                            onChange={(e) => handleArrayChange('secondaryObjectives', idx, e.target.value)}
-                            className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm border p-2"
-                        />
-                        <button onClick={() => removeArrayItem('secondaryObjectives', idx)} className="text-red-500 hover:text-red-700">
+                        <div className="relative flex-1">
+                            <input
+                                type="text"
+                                value={obj}
+                                onChange={(e) => handleArrayChange('secondaryObjectives', idx, e.target.value)}
+                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm border p-2 pr-8"
+                            />
+                             <button
+                                onClick={() => {
+                                  const context = `Primary Objective: ${data.primaryObjective}. Study Title: ${data.title}.`;
+                                  const instruction = "Rewrite this Secondary Objective to be SMART (Specific, Measurable, Achievable, Relevant, Time-bound).";
+                                  handleAIRefine(`secondaryObjectives[${idx}]`, obj, `${instruction} Context: ${context}`);
+                                }}
+                                disabled={loadingField === `secondaryObjectives[${idx}]` || !obj}
+                                className="absolute right-1 top-1 p-1.5 text-medical-600 hover:bg-medical-50 rounded-md transition-colors disabled:opacity-50"
+                                title={t.form.aiRefine}
+                              >
+                                {loadingField === `secondaryObjectives[${idx}]` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                              </button>
+                        </div>
+                        <button onClick={() => removeArrayItem('secondaryObjectives', idx)} className="text-red-500 hover:text-red-700 mt-1">
                             <Trash2 className="w-4 h-4" />
                         </button>
                     </div>
                 ))}
-                <button onClick={() => addArrayItem('secondaryObjectives')} className="flex items-center text-sm text-medical-600 hover:text-medical-800 font-medium">
+                <button onClick={() => addArrayItem('secondaryObjectives')} className="flex items-center text-sm text-medical-600 hover:text-medical-800 font-medium mt-2">
                     <Plus className="w-4 h-4 mr-1" />
                 </button>
              </div>
@@ -365,11 +582,31 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                     {renderAIButton('populationDescription', data.populationDescription, 'Population description')}
                 </div>
 
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">{t.form.labels.selMethod}</label>
+                <div className="bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm">
+                    <label className="block text-sm font-bold text-gray-800 mb-3 flex items-center">
+                         <Filter className="w-4 h-4 mr-2 text-medical-600" />
+                        {t.form.labels.selMethod}
+                    </label>
+                    
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                         <div className="col-span-1">
+                             <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">Sampling Strategy</label>
+                             <select
+                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm p-2"
+                                onChange={handleSamplingStrategyChange}
+                                defaultValue=""
+                             >
+                                <option value="" disabled>-- Select Standard Strategy --</option>
+                                {samplingStrategies.map((s) => (
+                                    <option key={s.value} value={s.value}>{s.label}</option>
+                                ))}
+                             </select>
+                         </div>
+                     </div>
+
                     <div className="relative">
                         <textarea
-                            rows={3}
+                            rows={4}
                             value={data.selectionMethod}
                             onChange={(e) => handleChange('selectionMethod', e.target.value)}
                             className="block w-full rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm border p-2"
@@ -379,69 +616,71 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                     </div>
                 </div>
 
-                <div>
-                    <div className="flex justify-between items-center mb-2">
-                        <label className="block text-sm font-semibold text-gray-700">{t.form.labels.incCrit}</label>
-                        <button
-                          onClick={() => handleAIGenerateList('inclusionCriteria')}
-                          disabled={loadingField === 'inclusionCriteria'}
-                          className="flex items-center px-3 py-1.5 text-xs font-medium text-medical-700 bg-medical-50 hover:bg-medical-100 border border-medical-200 rounded-full transition-colors"
-                        >
-                          {loadingField === 'inclusionCriteria' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Bot className="w-3 h-3 mr-1" />}
-                          {t.form.aiSuggest}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-white p-4 border border-gray-200 rounded-xl shadow-sm">
+                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
+                            <label className="block text-sm font-bold text-green-700">{t.form.labels.incCrit}</label>
+                            <button
+                            onClick={() => handleAIGenerateList('inclusionCriteria')}
+                            disabled={loadingField === 'inclusionCriteria'}
+                            className="flex items-center px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-full transition-colors"
+                            >
+                            {loadingField === 'inclusionCriteria' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Bot className="w-3 h-3 mr-1" />}
+                            Suggest
+                            </button>
+                        </div>
+                        <div className="space-y-3">
+                        {data.inclusionCriteria.map((item, idx) => (
+                            <div key={idx} className="flex gap-2 items-start">
+                                <span className="pt-2 text-gray-300 font-mono text-xs select-none">{idx + 1}.</span>
+                                <input
+                                    type="text"
+                                    value={item}
+                                    onChange={(e) => handleArrayChange('inclusionCriteria', idx, e.target.value)}
+                                    className="flex-1 rounded-md border-gray-200 bg-gray-50 focus:bg-white shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm border p-2"
+                                />
+                                <button onClick={() => removeArrayItem('inclusionCriteria', idx)} className="text-gray-400 hover:text-red-500 mt-2 transition-colors">
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ))}
+                        <button onClick={() => addArrayItem('inclusionCriteria')} className="w-full py-2 flex justify-center items-center text-sm text-green-600 hover:bg-green-50 rounded-md font-medium border border-dashed border-green-300 mt-2 transition-colors">
+                            <Plus className="w-4 h-4 mr-1" /> Add Inclusion Criterion
                         </button>
+                        </div>
                     </div>
-                    <div className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
-                      {data.inclusionCriteria.map((item, idx) => (
-                          <div key={idx} className="flex gap-2 items-start">
-                              <span className="pt-2 text-gray-400 font-mono text-xs select-none">{idx + 1}.</span>
-                              <input
-                                  type="text"
-                                  value={item}
-                                  onChange={(e) => handleArrayChange('inclusionCriteria', idx, e.target.value)}
-                                  className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm border p-2"
-                              />
-                              <button onClick={() => removeArrayItem('inclusionCriteria', idx)} className="text-red-400 hover:text-red-600 mt-2">
-                                  <Trash2 className="w-4 h-4" />
-                              </button>
-                          </div>
-                      ))}
-                      <button onClick={() => addArrayItem('inclusionCriteria')} className="flex items-center text-sm text-medical-600 hover:text-medical-800 font-medium mt-2">
-                          <Plus className="w-4 h-4 mr-1" />
-                      </button>
-                    </div>
-                </div>
 
-                <div>
-                     <div className="flex justify-between items-center mb-2">
-                        <label className="block text-sm font-semibold text-gray-700">{t.form.labels.excCrit}</label>
-                        <button
-                          onClick={() => handleAIGenerateList('exclusionCriteria')}
-                          disabled={loadingField === 'exclusionCriteria'}
-                          className="flex items-center px-3 py-1.5 text-xs font-medium text-medical-700 bg-medical-50 hover:bg-medical-100 border border-medical-200 rounded-full transition-colors"
-                        >
-                          {loadingField === 'exclusionCriteria' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Bot className="w-3 h-3 mr-1" />}
-                          {t.form.aiSuggest}
+                    <div className="bg-white p-4 border border-gray-200 rounded-xl shadow-sm">
+                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
+                            <label className="block text-sm font-bold text-red-700">{t.form.labels.excCrit}</label>
+                            <button
+                            onClick={() => handleAIGenerateList('exclusionCriteria')}
+                            disabled={loadingField === 'exclusionCriteria'}
+                            className="flex items-center px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-full transition-colors"
+                            >
+                            {loadingField === 'exclusionCriteria' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Bot className="w-3 h-3 mr-1" />}
+                            Suggest
+                            </button>
+                        </div>
+                        <div className="space-y-3">
+                        {data.exclusionCriteria.map((item, idx) => (
+                            <div key={idx} className="flex gap-2 items-start">
+                                <span className="pt-2 text-gray-300 font-mono text-xs select-none">{idx + 1}.</span>
+                                <input
+                                    type="text"
+                                    value={item}
+                                    onChange={(e) => handleArrayChange('exclusionCriteria', idx, e.target.value)}
+                                    className="flex-1 rounded-md border-gray-200 bg-gray-50 focus:bg-white shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm border p-2"
+                                />
+                                <button onClick={() => removeArrayItem('exclusionCriteria', idx)} className="text-gray-400 hover:text-red-500 mt-2 transition-colors">
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ))}
+                        <button onClick={() => addArrayItem('exclusionCriteria')} className="w-full py-2 flex justify-center items-center text-sm text-red-600 hover:bg-red-50 rounded-md font-medium border border-dashed border-red-300 mt-2 transition-colors">
+                            <Plus className="w-4 h-4 mr-1" /> Add Exclusion Criterion
                         </button>
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
-                      {data.exclusionCriteria.map((item, idx) => (
-                          <div key={idx} className="flex gap-2 items-start">
-                              <span className="pt-2 text-gray-400 font-mono text-xs select-none">{idx + 1}.</span>
-                              <input
-                                  type="text"
-                                  value={item}
-                                  onChange={(e) => handleArrayChange('exclusionCriteria', idx, e.target.value)}
-                                  className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm border p-2"
-                              />
-                              <button onClick={() => removeArrayItem('exclusionCriteria', idx)} className="text-red-400 hover:text-red-600 mt-2">
-                                  <Trash2 className="w-4 h-4" />
-                              </button>
-                          </div>
-                      ))}
-                      <button onClick={() => addArrayItem('exclusionCriteria')} className="flex items-center text-sm text-medical-600 hover:text-medical-800 font-medium mt-2">
-                          <Plus className="w-4 h-4 mr-1" />
-                      </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -452,7 +691,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
             <div className="space-y-6 animate-fadeIn">
                 <h3 className="text-lg font-semibold text-gray-800">{t.form.tabs.Design}</h3>
                 
-                <div className="grid grid-cols-2 gap-4 mb-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">{t.form.labels.studyType}</label>
                         <div className="flex gap-2">
@@ -465,6 +704,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                                 <option value="Estudio Descriptivo">Descriptive / Descriptivo</option>
                                 <option value="Estudio Transversal">Cross-sectional / Transversal</option>
                                 <option value="Estudio de Casos y Controles">Case-Control / Casos y Controles</option>
+                                <option value="Casos y Controles Anidado">Nested Case-Control / Anidado</option>
                                 <option value="Estudio de Cohortes">Cohort / Cohortes</option>
                                 <option value="Ensayo Clínico Aleatorizado">RCT / Ensayo Clínico Aleatorizado</option>
                                 <option value="Cuasi-experimental">Quasi-experimental / Cuasi-experimental</option>
@@ -478,6 +718,55 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                                 {loadingField === 'studyType' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Microscope className="w-4 h-4" />}
                             </button>
                         </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                         {/* Optional Subtypes based on broad type */}
+                         {data.studyType.toLowerCase().includes('ensayo') || data.studyType.toLowerCase().includes('rct') ? (
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.studySubtype}</label>
+                                    <select
+                                        value={data.designModel || ''}
+                                        onChange={(e) => handleChange('designModel', e.target.value)}
+                                        className="block w-full rounded-md border-gray-300 text-xs p-1.5"
+                                    >
+                                        <option value="">-- Select --</option>
+                                        <option value="parallel">{t.form.designModels.parallel}</option>
+                                        <option value="crossover">{t.form.designModels.crossover}</option>
+                                        <option value="factorial">{t.form.designModels.factorial}</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">{t.form.labels.controlType}</label>
+                                    <select
+                                        value={data.controlType || ''}
+                                        onChange={(e) => handleChange('controlType', e.target.value)}
+                                        className="block w-full rounded-md border-gray-300 text-xs p-1.5"
+                                    >
+                                        <option value="">-- Select --</option>
+                                        <option value="placebo">{t.form.controlTypes.placebo}</option>
+                                        <option value="active">{t.form.controlTypes.active}</option>
+                                        <option value="none">{t.form.controlTypes.none}</option>
+                                    </select>
+                                </div>
+                            </div>
+                         ) : null}
+                         
+                         {data.studyType.toLowerCase().includes('casos') || data.studyType.toLowerCase().includes('case') ? (
+                             <div className="flex items-center pt-6">
+                                <input
+                                    id="nested-check"
+                                    type="checkbox"
+                                    checked={data.isNested || false}
+                                    onChange={(e) => handleChange('isNested', e.target.checked)}
+                                    className="h-4 w-4 text-medical-600 focus:ring-medical-500 border-gray-300 rounded"
+                                />
+                                <label htmlFor="nested-check" className="ml-2 block text-sm text-gray-900">
+                                    {t.form.labels.isNested}
+                                </label>
+                             </div>
+                         ) : null}
                     </div>
                 </div>
 
@@ -496,8 +785,16 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                      <button
                         onClick={() => {
                           const studyType = data.studyType || 'Observacional';
-                          const instruction = `Act as an expert medical writer. Write a formal, precise, and academic methodological description for the Study Design section. Incorporate the specific study type (${studyType}) and ensure alignment with the primary objective. Use standard research terminology (e.g., multicenter, prospective, randomized, etc., as appropriate).`;
-                          const context = `Title: ${data.title}\nPrimary Objective: ${data.primaryObjective}\nStudy Type: ${studyType}`;
+                          const instruction = `Act as an expert medical writer. Write a formal, precise, and academic methodological description for the Study Design section. 
+                          
+                          Structure the response to include:
+                          1. Design Classification: Incorporate the specific study type (${studyType}) and subtypes (Model: ${data.designModel || 'standard'}, Control: ${data.controlType || 'N/A'}, Nested: ${data.isNested ? 'Yes' : 'No'}).
+                          2. Methodological Description: Detail the structure of the study (e.g., randomization, blinding, time-direction).
+                          3. Data Interpretation Implications: Explicitly state the methodological implications for data interpretation (e.g., ability to prove causality for RCTs, association vs causation for observational, potential biases like recall bias in case-control).
+                          
+                          Use standard research terminology (e.g., multicenter, prospective, randomized, crossover/parallel, etc., as appropriate).`;
+                          
+                          const context = `Title: ${data.title}\nPrimary Objective: ${data.primaryObjective}\nStudy Type: ${studyType}\nDesign Model: ${data.designModel}\nControl Type: ${data.controlType}`;
                           
                           if (!data.studyDesign) {
                               handleAIGenerateText('studyDesign', context, instruction);
@@ -624,6 +921,18 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                                 <div className="col-span-2">
                                     <label className="block text-xs text-gray-600 mb-1">{t.form.labels.effectSize}</label>
                                     <input type="text" placeholder="e.g. Cohen's d = 0.5" value={data.statsParams?.deltaOrEffectSize || ''} onChange={(e) => handleDeepChange('statsParams', 'deltaOrEffectSize', e.target.value)} className="w-full rounded border-gray-300 text-sm p-1.5" />
+                                </div>
+                                <div className="col-span-2 mt-2">
+                                    <button
+                                        onClick={handleCalculateSampleSize}
+                                        className="w-full flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                                    >
+                                        <Calculator className="w-4 h-4 mr-2" />
+                                        {t.form.labels.calculateBtn}
+                                    </button>
+                                    <p className="text-xs text-gray-500 mt-1 text-center">
+                                        {t.form.labels.calculateNote}
+                                    </p>
                                 </div>
                             </>
                         )}
@@ -909,7 +1218,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                  <button
                     onClick={() => {
                        const context = `Title: ${data.title}\nObj: ${data.primaryObjective}`;
-                       const instruction = "Generate a list of 3 simulated but realistic bibliography references in Vancouver style.";
+                       const instruction = "Generate a list of 3 simulated but realistic bibliography references in Vancouver style based on the current study title and primary objective.";
                        handleAIGenerateText('bibliography', context, instruction);
                     }}
                     disabled={loadingField === 'bibliography'}
@@ -919,12 +1228,12 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                    {t.form.aiSuggest}
                  </button>
                  <button
-                   onClick={() => handleAIRefine('bibliography', data.bibliography, 'Format these references strictly in Vancouver style.')}
+                   onClick={() => handleAIRefine('bibliography', data.bibliography, 'Reformat the provided list of references to strictly adhere to Vancouver style citation format. Ensure the output is a numbered list. Example format: 1. Author AA, Author BB. Title of article. Abbreviated Journal Title. Year;Volume(Issue):Page numbers.')}
                    disabled={!data.bibliography || loadingField === 'bibliography'}
                    className="flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-md transition-colors"
                  >
                     {loadingField === 'bibliography' ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Wand2 className="w-3 h-3 mr-1" />}
-                    Format
+                    Format (Vancouver)
                  </button>
               </div>
             </div>

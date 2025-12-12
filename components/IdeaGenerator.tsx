@@ -9,10 +9,12 @@ interface Props {
 }
 
 // Internal types for the wizard state
-type StudyAim = 'descriptive' | 'analytical' | null;
 type InterventionStatus = 'yes' | 'no' | null;
 type TimeDirection = 'retrospective' | 'prospective' | 'cross-sectional' | null;
 type ControlGroup = 'yes' | 'no' | null;
+type ControlType = 'placebo' | 'active' | null;
+type DesignModel = 'parallel' | 'crossover' | null;
+type CaseControlModel = 'standard' | 'nested' | null;
 
 export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
   const { t, language } = useLanguage();
@@ -28,6 +30,11 @@ export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
   const [hasControl, setHasControl] = useState<ControlGroup>(null);
   const [timeDirection, setTimeDirection] = useState<TimeDirection>(null);
   const [randomized, setRandomized] = useState<boolean>(false);
+  
+  // New State for Advanced Designs
+  const [designModel, setDesignModel] = useState<DesignModel>(null);
+  const [controlType, setControlType] = useState<ControlType>(null);
+  const [caseControlModel, setCaseControlModel] = useState<CaseControlModel>(null);
 
   const generateProtocol = () => {
     let generatedData = { ...INITIAL_PROTOCOL_DATA };
@@ -66,24 +73,55 @@ export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
     if (hasIntervention === 'yes') {
         // Experimental
         if (randomized) {
+            // RCT Logic with Subtypes
+            const isCrossover = designModel === 'crossover';
+            const isActive = controlType === 'active';
+            
+            generatedData.designModel = isCrossover ? 'crossover' : 'parallel';
+            generatedData.controlType = isActive ? 'active' : 'placebo';
+
+            const designAdjective = isCrossover 
+                ? (isEs ? "Cruzado (Crossover)" : "Crossover")
+                : (isEs ? "de Grupos Paralelos" : "Parallel Group");
+
+            const controlAdjective = isActive
+                ? (isEs ? "controlado con comparador activo" : "active-controlled")
+                : (isEs ? "controlado con placebo" : "placebo-controlled");
+
             designText = isEs 
-                ? "Ensayo Clínico Aleatorizado (ECA), controlado, prospectivo."
-                : "Randomized Clinical Trial (RCT), controlled, prospective.";
+                ? `Ensayo Clínico Aleatorizado (ECA), ${designAdjective}, ${controlAdjective}, prospectivo.`
+                : `Randomized Clinical Trial (RCT), ${designAdjective}, ${controlAdjective}, prospective.`;
+            
             studyType = isEs ? "Ensayo Clínico" : "Clinical Trial";
-            statsText = isEs 
-                ? ["Análisis por intención de tratar.", "Comparación de proporciones o medias."] 
-                : ["Intention-to-treat analysis.", "Comparison of proportions or means."];
+            
+            if (isCrossover) {
+                 statsText = isEs 
+                    ? ["Análisis de modelos mixtos o ANOVA para medidas repetidas.", "Evaluación de efecto período y arrastre (carry-over)."] 
+                    : ["Mixed models or ANOVA for repeated measures.", "Evaluation of period and carry-over effects."];
+            } else {
+                 statsText = isEs 
+                    ? ["Análisis por intención de tratar.", "Comparación de proporciones o medias."] 
+                    : ["Intention-to-treat analysis.", "Comparison of proportions or means."];
+            }
             
             const groupInt = isEs ? "Grupo Intervención" : "Intervention Group";
             const groupCtrl = isEs ? "Grupo Control" : "Control Group";
-            const placebo = isEs ? "Placebo o tratamiento estándar" : "Placebo or standard care";
-            generatedData.interventions = `${groupInt}: ${pico.intervention}.\n${groupCtrl}: ${pico.comparison || placebo}.`;
+            const controlName = isActive ? (pico.comparison || (isEs ? 'Tratamiento Estándar' : 'Standard Care')) : (isEs ? 'Placebo' : 'Placebo');
+            
+            generatedData.interventions = `${groupInt}: ${pico.intervention}.\n${groupCtrl}: ${controlName}.`;
             
             // Hypothesis Drafting for RCT
             hypType = 'superiority';
-            hypothesisText = isEs
-                ? `El tratamiento con ${pico.intervention} es superior a ${pico.comparison || 'placebo'} en términos de mejorar ${pico.outcome} en la población seleccionada.`
-                : `Treatment with ${pico.intervention} is superior to ${pico.comparison || 'placebo'} in terms of improving ${pico.outcome} in the selected population.`;
+            if (isActive) {
+                 // Active control often implies non-inferiority, but let's default to superiority or let them change it
+                 hypothesisText = isEs
+                    ? `El tratamiento con ${pico.intervention} es superior (o no-inferior) a ${controlName} en ${pico.outcome}.`
+                    : `Treatment with ${pico.intervention} is superior (or non-inferior) to ${controlName} on ${pico.outcome}.`;
+            } else {
+                 hypothesisText = isEs
+                    ? `El tratamiento con ${pico.intervention} es superior a ${controlName} en términos de mejorar ${pico.outcome}.`
+                    : `Treatment with ${pico.intervention} is superior to ${controlName} in terms of improving ${pico.outcome}.`;
+            }
 
         } else {
             designText = isEs 
@@ -122,10 +160,17 @@ export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
                     ? ["Cálculo de Prevalencia (Odds Ratio)."]
                     : ["Prevalence calculation (Odds Ratio)."];
             } else if (timeDirection === 'retrospective') {
+                const isNested = caseControlModel === 'nested';
+                generatedData.isNested = isNested;
+
                 designText = isEs
-                    ? "Estudio Observacional Analítico: Casos y Controles."
-                    : "Analytic Observational Study: Case-Control.";
-                studyType = isEs ? "Casos y Controles" : "Case-Control";
+                    ? `Estudio Observacional Analítico: Casos y Controles${isNested ? ' Anidado (Nested)' : ''}.`
+                    : `Analytic Observational Study: Case-Control${isNested ? ' (Nested)' : ''}.`;
+                
+                studyType = isEs 
+                    ? (isNested ? "Casos y Controles Anidado" : "Casos y Controles") 
+                    : (isNested ? "Nested Case-Control" : "Case-Control");
+
                 statsText = ["Odds Ratio (OR)."];
                 const cases = isEs ? "Casos" : "Cases";
                 const ctrls = isEs ? "Controles" : "Controls";
@@ -245,12 +290,15 @@ export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
       </h2>
       <p className="text-gray-600 text-sm">{t.wizard.step2Desc}</p>
 
-      {/* Q1 */}
+      {/* Q1: Experimental vs Observational */}
       <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
         <p className="font-medium text-gray-900 mb-3">{t.wizard.q1}</p>
         <div className="flex gap-4">
           <button
-            onClick={() => setHasIntervention('yes')}
+            onClick={() => {
+                setHasIntervention('yes');
+                setHasControl(null); // reset downstream
+            }}
             className={`flex-1 py-3 px-4 rounded-md border ${hasIntervention === 'yes' ? 'bg-medical-50 border-medical-500 text-medical-700' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
           >
             {t.wizard.yesExp}
@@ -259,6 +307,8 @@ export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
             onClick={() => {
                 setHasIntervention('no');
                 setRandomized(false);
+                setDesignModel(null);
+                setControlType(null);
             }}
             className={`flex-1 py-3 px-4 rounded-md border ${hasIntervention === 'no' ? 'bg-medical-50 border-medical-500 text-medical-700' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
           >
@@ -267,6 +317,7 @@ export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
         </div>
       </div>
 
+      {/* EXPERIMENTAL BRANCH */}
       {/* Q2 Randomized */}
       {hasIntervention === 'yes' && (
         <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm animate-fadeIn">
@@ -279,7 +330,11 @@ export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
               {t.wizard.yesRCT}
             </button>
             <button
-              onClick={() => setRandomized(false)}
+              onClick={() => {
+                  setRandomized(false);
+                  setDesignModel(null);
+                  setControlType(null);
+              }}
               className={`flex-1 py-3 px-4 rounded-md border ${randomized === false ? 'bg-medical-50 border-medical-500 text-medical-700' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
             >
               {t.wizard.noQuasi}
@@ -288,6 +343,49 @@ export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
         </div>
       )}
 
+      {/* RCT Sub-questions: Design & Control */}
+      {hasIntervention === 'yes' && randomized && (
+          <>
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 shadow-sm animate-fadeIn">
+                <p className="font-medium text-blue-900 mb-3">{t.wizard.qRCTDesign}</p>
+                <div className="flex gap-4">
+                    <button
+                        onClick={() => setDesignModel('parallel')}
+                        className={`flex-1 py-2 px-3 text-sm rounded-md border ${designModel === 'parallel' ? 'bg-white border-blue-500 text-blue-700 font-semibold' : 'bg-white/50 border-blue-200 hover:bg-white'}`}
+                    >
+                        {t.wizard.parallel}
+                    </button>
+                    <button
+                        onClick={() => setDesignModel('crossover')}
+                        className={`flex-1 py-2 px-3 text-sm rounded-md border ${designModel === 'crossover' ? 'bg-white border-blue-500 text-blue-700 font-semibold' : 'bg-white/50 border-blue-200 hover:bg-white'}`}
+                    >
+                        {t.wizard.crossover}
+                    </button>
+                </div>
+            </div>
+
+             <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 shadow-sm animate-fadeIn">
+                <p className="font-medium text-blue-900 mb-3">{t.wizard.qControl}</p>
+                <div className="flex gap-4">
+                    <button
+                        onClick={() => setControlType('placebo')}
+                        className={`flex-1 py-2 px-3 text-sm rounded-md border ${controlType === 'placebo' ? 'bg-white border-blue-500 text-blue-700 font-semibold' : 'bg-white/50 border-blue-200 hover:bg-white'}`}
+                    >
+                        {t.wizard.placebo}
+                    </button>
+                    <button
+                        onClick={() => setControlType('active')}
+                        className={`flex-1 py-2 px-3 text-sm rounded-md border ${controlType === 'active' ? 'bg-white border-blue-500 text-blue-700 font-semibold' : 'bg-white/50 border-blue-200 hover:bg-white'}`}
+                    >
+                        {t.wizard.active}
+                    </button>
+                </div>
+            </div>
+          </>
+      )}
+
+
+      {/* OBSERVATIONAL BRANCH */}
       {/* Q2 Comparison */}
       {hasIntervention === 'no' && (
         <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm animate-fadeIn">
@@ -303,6 +401,7 @@ export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
               onClick={() => {
                   setHasControl('no');
                   setTimeDirection('cross-sectional');
+                  setCaseControlModel(null);
               }}
               className={`flex-1 py-3 px-4 rounded-md border ${hasControl === 'no' ? 'bg-medical-50 border-medical-500 text-medical-700' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
             >
@@ -318,19 +417,25 @@ export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
           <p className="font-medium text-gray-900 mb-3">{t.wizard.q3Time}</p>
           <div className="grid grid-cols-1 gap-2">
             <button
-              onClick={() => setTimeDirection('prospective')}
+              onClick={() => {
+                  setTimeDirection('prospective');
+                  setCaseControlModel(null);
+              }}
               className={`py-3 px-4 text-left rounded-md border ${timeDirection === 'prospective' ? 'bg-medical-50 border-medical-500 text-medical-700' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
             >
-              {t.wizard.prosp}
+              {t.wizard.prosp} (Cohort)
             </button>
             <button
               onClick={() => setTimeDirection('retrospective')}
               className={`py-3 px-4 text-left rounded-md border ${timeDirection === 'retrospective' ? 'bg-medical-50 border-medical-500 text-medical-700' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
             >
-              {t.wizard.retro}
+              {t.wizard.retro} (Case-Control)
             </button>
             <button
-              onClick={() => setTimeDirection('cross-sectional')}
+              onClick={() => {
+                  setTimeDirection('cross-sectional');
+                  setCaseControlModel(null);
+              }}
               className={`py-3 px-4 text-left rounded-md border ${timeDirection === 'cross-sectional' ? 'bg-medical-50 border-medical-500 text-medical-700' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
             >
               {t.wizard.cross}
@@ -338,6 +443,28 @@ export const IdeaGenerator: React.FC<Props> = ({ onComplete }) => {
           </div>
         </div>
       )}
+
+      {/* Case-Control Sub-questions: Nested? */}
+      {hasIntervention === 'no' && hasControl === 'yes' && timeDirection === 'retrospective' && (
+         <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 shadow-sm animate-fadeIn">
+            <p className="font-medium text-purple-900 mb-3">{t.wizard.qNested}</p>
+            <div className="flex gap-4">
+                <button
+                    onClick={() => setCaseControlModel('standard')}
+                    className={`flex-1 py-2 px-3 text-sm rounded-md border ${caseControlModel === 'standard' ? 'bg-white border-purple-500 text-purple-700 font-semibold' : 'bg-white/50 border-purple-200 hover:bg-white'}`}
+                >
+                    {t.wizard.stdCaseControl}
+                </button>
+                <button
+                    onClick={() => setCaseControlModel('nested')}
+                    className={`flex-1 py-2 px-3 text-sm rounded-md border ${caseControlModel === 'nested' ? 'bg-white border-purple-500 text-purple-700 font-semibold' : 'bg-white/50 border-purple-200 hover:bg-white'}`}
+                >
+                    {t.wizard.nested}
+                </button>
+            </div>
+        </div>
+      )}
+
 
       <div className="flex justify-between pt-4">
         <button
