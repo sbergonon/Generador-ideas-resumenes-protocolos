@@ -1,22 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ProtocolData } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Printer, FileDown } from 'lucide-react';
+import { Printer, FileDown, Mail, Copy, Check, ZoomIn, ZoomOut } from 'lucide-react';
 
 interface Props {
   data: ProtocolData;
 }
 
 export const ProtocolPreview: React.FC<Props> = ({ data }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const currentDate = new Date().toLocaleDateString();
+  const [copied, setCopied] = useState(false);
+  const [fontSize, setFontSize] = useState(11); // Default pt size
 
   const handlePrint = () => {
     window.print();
   };
 
   const handleWordExport = () => {
-    // Basic HTML to Docx Blob approach
     const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' "+
          "xmlns:w='urn:schemas-microsoft-com:office:word' "+
          "xmlns='http://www.w3.org/TR/REC-html40'>"+
@@ -33,35 +34,100 @@ export const ProtocolPreview: React.FC<Props> = ({ data }) => {
     document.body.removeChild(fileDownload);
   };
 
+  const handleEmail = () => {
+      const subject = encodeURIComponent(`Synopsis: ${data.title.substring(0, 50)}...`);
+      const bodyIntro = language === 'es' 
+        ? `Estimados,\n\nAdjunto encontrarán la Sinopsis Metodológica para el estudio titulado: "${data.title}".\n\nPor favor, revisen el documento adjunto (PDF/Word).\n\nSaludos cordiales,\n${data.sponsor || ''}`
+        : `Dear Team,\n\nPlease find attached the Methodological Synopsis for the study: "${data.title}".\n\nKindly review the attached document (PDF/Word).\n\nBest regards,\n${data.sponsor || ''}`;
+      
+      const body = encodeURIComponent(bodyIntro);
+      window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  };
+
+  const handleCopyText = () => {
+      const content = document.getElementById("preview-content")?.innerText;
+      if (content) {
+          navigator.clipboard.writeText(content);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+      }
+  };
+
   const formatDate = (dateStr: string) => {
       if (!dateStr) return '';
       const date = new Date(dateStr);
-      return isNaN(date.getTime()) ? dateStr : date.toLocaleDateString(); // Defaults to local DD/MM/YYYY usually
+      return isNaN(date.getTime()) ? dateStr : date.toLocaleDateString();
   };
 
   return (
     <div className="h-full flex flex-col">
         {/* Toolbar */}
-        <div className="bg-white border-b border-gray-200 p-2 flex justify-end space-x-2 print:hidden">
+        <div className="bg-white border-b border-gray-200 p-2 flex flex-wrap justify-end gap-2 print:hidden items-center">
+             
+             {/* View Controls */}
+             <div className="flex items-center mr-4 bg-gray-50 rounded-md border border-gray-200">
+                <button 
+                    onClick={() => setFontSize(Math.max(8, fontSize - 1))}
+                    className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-l-md transition-colors"
+                    title="Decrease Font Size"
+                >
+                    <ZoomOut className="w-4 h-4" />
+                </button>
+                <span className="text-xs font-mono w-8 text-center text-gray-500">{fontSize}pt</span>
+                <button 
+                    onClick={() => setFontSize(Math.min(16, fontSize + 1))}
+                    className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-r-md transition-colors"
+                    title="Increase Font Size"
+                >
+                    <ZoomIn className="w-4 h-4" />
+                </button>
+             </div>
+
+             {/* Actions */}
              <button 
-                onClick={handlePrint}
-                className="flex items-center text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-md transition-colors"
+                onClick={handleCopyText}
+                className="flex items-center text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md transition-colors"
+                title="Copy text to clipboard"
             >
-                <Printer className="w-4 h-4 mr-2" />
-                Save PDF
+                {copied ? <Check className="w-4 h-4 mr-2 text-green-600" /> : <Copy className="w-4 h-4 mr-2" />}
+                {copied ? (language === 'es' ? 'Copiado' : 'Copied') : (language === 'es' ? 'Copiar Texto' : 'Copy Text')}
             </button>
-            <button 
+
+             <button 
+                onClick={handleEmail}
+                className="flex items-center text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md transition-colors"
+                title="Send via Email client"
+            >
+                <Mail className="w-4 h-4 mr-2" />
+                Email
+            </button>
+
+             <div className="h-6 w-px bg-gray-300 mx-1"></div>
+
+             <button 
                 onClick={handleWordExport}
-                className="flex items-center text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded-md transition-colors border border-blue-200"
+                className="flex items-center text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded-md transition-colors border border-blue-200"
             >
                 <FileDown className="w-4 h-4 mr-2" />
                 Word
+            </button>
+
+             <button 
+                onClick={handlePrint}
+                className="flex items-center text-xs bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-md transition-colors shadow-sm"
+            >
+                <Printer className="w-4 h-4 mr-2" />
+                PDF / Print
             </button>
         </div>
 
         {/* Content */}
         <div className="overflow-y-auto bg-gray-200 p-8 print:p-0 print:bg-white flex-1">
-        <div id="preview-content" className="mx-auto bg-white shadow-lg w-full max-w-[210mm] min-h-[297mm] p-[20mm] text-black font-serif text-[11pt] leading-relaxed print:shadow-none print:max-w-none print:w-full">
+        <div 
+            id="preview-content" 
+            className="mx-auto bg-white shadow-lg w-full max-w-[210mm] min-h-[297mm] p-[20mm] text-black font-serif leading-relaxed print:shadow-none print:max-w-none print:w-full transition-all duration-200"
+            style={{ fontSize: `${fontSize}pt` }}
+        >
             
             <div className="flex justify-between border-b-2 border-black pb-2 mb-6 text-sm">
                 <span>{data.sponsor || 'XXXXXXX'}</span>
