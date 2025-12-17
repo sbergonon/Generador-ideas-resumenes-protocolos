@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ProtocolForm } from './components/ProtocolForm';
 import { ProtocolPreview } from './components/ProtocolPreview';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { IdeaGenerator } from './components/IdeaGenerator';
 import { ProtocolData, AppView } from './types';
 import { INITIAL_PROTOCOL_DATA } from './constants';
-import { FileText, PenTool, LayoutTemplate, Save, FolderOpen, RotateCcw, Book, Globe, Home, BookOpen } from 'lucide-react';
+import { FileText, PenTool, LayoutTemplate, Save, FolderOpen, RotateCcw, Book, Globe, Home, BookOpen, Download, Upload } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { UserManualModal } from './components/UserManualModal';
 import { GlossaryModal } from './components/GlossaryModal';
@@ -16,12 +16,14 @@ const MainApp: React.FC = () => {
   const [protocolData, setProtocolData] = useState<ProtocolData>(INITIAL_PROTOCOL_DATA);
   const [isManualOpen, setIsManualOpen] = useState(false);
   const [isGlossaryOpen, setIsGlossaryOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleIdeaGenerated = (data: ProtocolData) => {
     setProtocolData(data);
     setView('editor');
   };
 
+  // --- Browser Storage (Quick Draft) ---
   const handleSaveDraft = () => {
     try {
       localStorage.setItem('protocol_draft', JSON.stringify(protocolData));
@@ -37,33 +39,7 @@ const MainApp: React.FC = () => {
       if (saved) {
         if (window.confirm(t.app.confirmLoad)) {
             const parsed = JSON.parse(saved);
-            
-            // Smart Merge: Ensure new fields from INITIAL_PROTOCOL_DATA exist in the loaded data
-            // This prevents "Blank Screen" crashes when loading old drafts without 'schedule' or 'appendices'
-            const mergedData: ProtocolData = {
-                ...INITIAL_PROTOCOL_DATA, // Start with full new structure
-                ...parsed, // Override with saved data
-                // Deep merge nested objects to avoid overwriting them with undefined
-                statsParams: { 
-                    ...INITIAL_PROTOCOL_DATA.statsParams, 
-                    ...(parsed.statsParams || {}) 
-                },
-                schedule: { 
-                    ...INITIAL_PROTOCOL_DATA.schedule, 
-                    ...(parsed.schedule || {}) 
-                },
-                // Ensure arrays are arrays (fallback to initial if missing)
-                secondaryObjectives: parsed.secondaryObjectives || INITIAL_PROTOCOL_DATA.secondaryObjectives,
-                inclusionCriteria: parsed.inclusionCriteria || INITIAL_PROTOCOL_DATA.inclusionCriteria,
-                exclusionCriteria: parsed.exclusionCriteria || INITIAL_PROTOCOL_DATA.exclusionCriteria,
-                evaluationsSecondary: parsed.evaluationsSecondary || INITIAL_PROTOCOL_DATA.evaluationsSecondary,
-                variableDefinitions: parsed.variableDefinitions || INITIAL_PROTOCOL_DATA.variableDefinitions,
-                otherVariables: parsed.otherVariables || INITIAL_PROTOCOL_DATA.otherVariables,
-                statisticalAnalysis: parsed.statisticalAnalysis || INITIAL_PROTOCOL_DATA.statisticalAnalysis,
-            };
-
-            setProtocolData(mergedData);
-            if (view === 'welcome') setView('editor');
+            mergeAndSetData(parsed);
             alert(t.app.loadSuccess);
         }
       } else {
@@ -73,6 +49,72 @@ const MainApp: React.FC = () => {
       console.error(e);
       alert('Error loading draft.');
     }
+  };
+
+  // --- File System Storage (JSON Export/Import) ---
+  const handleExportJSON = () => {
+      const fileName = `Study_${protocolData.title.replace(/[^a-z0-9]/gi, '_').substring(0, 30) || 'Untitled'}_${new Date().toISOString().split('T')[0]}.json`;
+      const jsonStr = JSON.stringify(protocolData, null, 2);
+      const blob = new Blob([jsonStr], { type: "application/json" });
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = href;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  };
+
+  const handleImportClick = () => {
+      fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+          try {
+              const content = e.target?.result as string;
+              const parsed = JSON.parse(content);
+              if (window.confirm(language === 'es' ? `¿Cargar archivo "${file.name}"? Perderás los cambios no guardados.` : `Load file "${file.name}"? Unsaved changes will be lost.`)) {
+                  mergeAndSetData(parsed);
+              }
+          } catch (err) {
+              alert("Error parsing JSON file.");
+          }
+      };
+      reader.readAsText(file);
+      // Reset input so same file can be selected again
+      event.target.value = ''; 
+  };
+
+  // Helper to safely merge data
+  const mergeAndSetData = (parsed: any) => {
+        const mergedData: ProtocolData = {
+            ...INITIAL_PROTOCOL_DATA, // Start with full new structure
+            ...parsed, // Override with saved data
+            // Deep merge nested objects
+            statsParams: { 
+                ...INITIAL_PROTOCOL_DATA.statsParams, 
+                ...(parsed.statsParams || {}) 
+            },
+            schedule: { 
+                ...INITIAL_PROTOCOL_DATA.schedule, 
+                ...(parsed.schedule || {}) 
+            },
+            // Ensure arrays are arrays
+            secondaryObjectives: parsed.secondaryObjectives || INITIAL_PROTOCOL_DATA.secondaryObjectives,
+            inclusionCriteria: parsed.inclusionCriteria || INITIAL_PROTOCOL_DATA.inclusionCriteria,
+            exclusionCriteria: parsed.exclusionCriteria || INITIAL_PROTOCOL_DATA.exclusionCriteria,
+            evaluationsSecondary: parsed.evaluationsSecondary || INITIAL_PROTOCOL_DATA.evaluationsSecondary,
+            variableDefinitions: parsed.variableDefinitions || INITIAL_PROTOCOL_DATA.variableDefinitions,
+            otherVariables: parsed.otherVariables || INITIAL_PROTOCOL_DATA.otherVariables,
+            statisticalAnalysis: parsed.statisticalAnalysis || INITIAL_PROTOCOL_DATA.statisticalAnalysis,
+        };
+        setProtocolData(mergedData);
+        if (view === 'welcome') setView('editor');
   };
 
   const handleResetData = () => {
@@ -96,6 +138,8 @@ const MainApp: React.FC = () => {
       <div className="relative">
         <UserManualModal isOpen={isManualOpen} onClose={() => setIsManualOpen(false)} />
         <GlossaryModal isOpen={isGlossaryOpen} onClose={() => setIsGlossaryOpen(false)} />
+        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
+        
         <WelcomeScreen 
             onStart={() => setView('wizard')} 
             onOpenManual={() => setIsManualOpen(true)}
@@ -110,11 +154,11 @@ const MainApp: React.FC = () => {
                 {language === 'es' ? 'EN' : 'ES'}
             </button>
              <button
-                onClick={handleLoadDraft}
+                onClick={handleImportClick}
                 className="flex items-center px-4 py-2 text-sm font-medium text-medical-700 bg-white/80 backdrop-blur-sm border border-medical-200 rounded-lg hover:bg-white transition-all shadow-sm"
               >
-                <FolderOpen className="w-4 h-4 mr-2" />
-                {t.app.loadDraft}
+                <Upload className="w-4 h-4 mr-2" />
+                {language === 'es' ? 'Abrir Estudio' : 'Open Study'}
               </button>
         </div>
       </div>
@@ -153,6 +197,7 @@ const MainApp: React.FC = () => {
     <div className="flex flex-col h-screen overflow-hidden">
       <UserManualModal isOpen={isManualOpen} onClose={() => setIsManualOpen(false)} />
       <GlossaryModal isOpen={isGlossaryOpen} onClose={() => setIsGlossaryOpen(false)} />
+      <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
       
       {/* App Header */}
       <header className="bg-medical-900 text-white p-4 shadow-md z-10 flex justify-between items-center">
@@ -161,8 +206,8 @@ const MainApp: React.FC = () => {
             <FileText className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight">{t.app.title}</h1>
-            <p className="text-xs text-medical-100 opacity-80">{t.app.subtitle}</p>
+            <h1 className="text-xl font-bold tracking-tight hidden md:block">{t.app.title}</h1>
+            <p className="text-xs text-medical-100 opacity-80 hidden md:block">{t.app.subtitle}</p>
           </div>
         </div>
         
@@ -174,56 +219,43 @@ const MainApp: React.FC = () => {
             >
                 {language === 'es' ? 'EN' : 'ES'}
             </button>
-             <button 
-                onClick={() => setIsGlossaryOpen(true)}
-                className="flex items-center text-sm bg-medical-800 hover:bg-medical-700 px-3 py-2 rounded-md transition-colors border border-medical-700"
-                title={t.app.glossary}
-            >
-                <BookOpen className="w-4 h-4 mr-2" />
-                {t.app.glossary}
-            </button>
-            <button 
-                onClick={() => setIsManualOpen(true)}
-                className="flex items-center text-sm bg-medical-800 hover:bg-medical-700 px-3 py-2 rounded-md transition-colors border border-medical-700"
-                title={t.app.manual}
-            >
-                <Book className="w-4 h-4 mr-2" />
-                {t.app.manual}
-            </button>
+            <div className="h-6 w-px bg-medical-700 mx-1 hidden md:block"></div>
 
-            <div className="h-6 w-px bg-medical-700 mx-1"></div>
-
-           <button 
-                onClick={handleLoadDraft}
-                className="flex items-center text-sm bg-medical-800 hover:bg-medical-700 px-3 py-2 rounded-md transition-colors border border-medical-700"
-                title={t.app.loadDraft}
-            >
-                <FolderOpen className="w-4 h-4 mr-2" />
-                {t.app.loadDraft}
-            </button>
+            {/* Browser Storage */}
             <button 
                 onClick={handleSaveDraft}
                 className="flex items-center text-sm bg-medical-800 hover:bg-medical-700 px-3 py-2 rounded-md transition-colors border border-medical-700"
                 title={t.app.saveDraft}
             >
                 <Save className="w-4 h-4 mr-2" />
-                {t.app.saveDraft}
+                <span className="hidden lg:inline">{t.app.saveDraft}</span>
             </button>
+
+            {/* File System Storage */}
             <button 
-                onClick={handleResetData}
-                className="flex items-center text-sm bg-medical-800 hover:bg-medical-700 px-3 py-2 rounded-md transition-colors border border-medical-700"
-                title={t.app.reset}
+                onClick={handleExportJSON}
+                className="flex items-center text-sm bg-blue-700 hover:bg-blue-600 px-3 py-2 rounded-md transition-colors border border-blue-600 shadow-sm"
+                title={language === 'es' ? "Guardar Archivo Local" : "Save Local File"}
             >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                {t.app.reset}
+                <Download className="w-4 h-4 mr-2" />
+                <span className="hidden lg:inline">{language === 'es' ? "Exportar" : "Export"}</span>
             </button>
-            <div className="h-6 w-px bg-medical-700 mx-2"></div>
+             <button 
+                onClick={handleImportClick}
+                className="flex items-center text-sm bg-blue-700 hover:bg-blue-600 px-3 py-2 rounded-md transition-colors border border-blue-600 shadow-sm"
+                title={language === 'es' ? "Cargar Archivo Local" : "Load Local File"}
+            >
+                <Upload className="w-4 h-4 mr-2" />
+                <span className="hidden lg:inline">{language === 'es' ? "Importar" : "Import"}</span>
+            </button>
+
+            <div className="h-6 w-px bg-medical-700 mx-2 hidden md:block"></div>
             <button 
                 onClick={() => setView('wizard')}
                 className="flex items-center text-sm bg-white text-medical-900 hover:bg-medical-50 px-3 py-2 rounded-md transition-colors font-medium"
             >
                 <LayoutTemplate className="w-4 h-4 mr-2" />
-                {t.app.newDesign}
+                <span className="hidden md:inline">{t.app.newDesign}</span>
             </button>
         </div>
       </header>

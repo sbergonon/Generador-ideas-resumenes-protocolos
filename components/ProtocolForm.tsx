@@ -108,7 +108,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
       const currentCount = existingRefLines.length;
 
       // If there are new references returned by AI
-      if (result.references && result.references.length > 5) {
+      if (result.references && result.references.length > 10) {
           // 1. Shift citation numbers in the TEXT
           // AI usually returns [1], [2]. We need to map them to [currentCount + 1], [currentCount + 2]
           finalText = finalText.replace(/\[(\d+)\]/g, (match, num) => {
@@ -175,15 +175,18 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
   
   const handleSuggestEvaluations = async (field: keyof ProtocolData) => {
     setLoadingField(field);
+    // CRITICAL: We pass the STRICT design params to override any old text in 'studyDesign'
     const context = `
         Title: ${data.title}
         Primary Objective: ${data.primaryObjective}
         Secondary Objectives: ${data.secondaryObjectives.join(', ')}
         Scales: ${data.measurementScales.join(', ')}
-        Study Type: ${data.studyType}
+        Study Type (STRICT): ${data.studyType}
+        Design Model (STRICT): ${data.designModel}
+        Follow-up: ${data.followUpDuration}
     `;
     const instruction = field === 'evaluationsGeneral'
-        ? "Suggest a general schedule of assessments and evaluations suitable for this study design. Mention Screening, Baseline, and Follow-up visits."
+        ? `Suggest a general schedule of assessments and evaluations suitable for this ${data.studyType} study. Mention Screening, Baseline, and Follow-up visits.`
         : "Suggest specific methods, timings, and procedures to evaluate the PRIMARY variable/endpoint.";
 
     // We use generateText because suggestions usually don't need citations yet, but can be edited
@@ -209,7 +212,8 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
 
     if (field === 'statisticalAnalysis') {
         typeLabel = 'technical statistical analysis steps (Descriptive, Inferential, and Modeling)';
-        context = `...`; // (Same context as before)
+        // Strict Design Context
+        context = `Study Type: ${data.studyType}. Design Model: ${data.designModel}. Hypothesis: ${data.analysisHypothesis}.`;
     } else if (field === 'measurementScales') {
         typeLabel = 'standard clinical scales or validated metrics specifically relevant to this pathology/condition';
         context = `Study Title: ${data.title}. Primary Objective: ${data.primaryObjective}.`;
@@ -787,10 +791,9 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
       case SectionTab.DESIGN:
         return (
             <div className="space-y-6 animate-fadeIn">
-                {/* ... (Previous Design code, updating variable definitions button text) ... */}
                 <h3 className="text-lg font-semibold text-gray-800">{t.form.tabs.Design}</h3>
                 
-                {/* ... (Study type dropdowns remain same) ... */}
+                {/* ... (Study type dropdowns) ... */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">{t.form.labels.studyType}</label>
@@ -899,9 +902,9 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                      <button
                         onClick={() => {
                           const studyType = data.studyType || 'Observacional';
-                          // STRICT INSTRUCTION to ignore previous text if generating fresh
-                          const instruction = `Act as an expert medical writer. Write a formal, precise, and academic methodological description. Structure: 1. Design Classification. 2. Methodological Description. 3. Data Interpretation Implications. SYSTEM INSTRUCTION: Strictly adhere to the Study Type: ${studyType} and Design Model: ${data.designModel}. Ignore any previous mentions of other designs. Use references [1] if needed.`;
-                          const context = `Title: ${data.title}\nObj: ${data.primaryObjective}\nType: ${studyType}\nModel: ${data.designModel}\nControl: ${data.controlType}\nFollow-up: ${data.followUpDuration}`;
+                          // STRICT INSTRUCTION to use CURRENT dropdown values
+                          const instruction = `Act as an expert medical writer. Write a formal, precise, and academic methodological description. Structure: 1. Design Classification. 2. Methodological Description. 3. Data Interpretation Implications. SYSTEM INSTRUCTION: Write ONLY based on these parameters: Type=${studyType}, Model=${data.designModel}, Control=${data.controlType}, Follow-up=${data.followUpDuration}. IGNORE any conflicting information from previous text inputs. Use references [1] if needed.`;
+                          const context = `Title: ${data.title}\nObj: ${data.primaryObjective}`;
                           
                           handleAIGenerateTextWithRefs('studyDesign', context, instruction);
                         }}
@@ -909,7 +912,8 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                         className="absolute right-2 bottom-2 bg-medical-50 text-medical-700 hover:bg-medical-100 px-3 py-1 rounded-md text-xs font-medium flex items-center transition-colors shadow-sm border border-medical-200"
                      >
                        {loadingField === 'studyDesign' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Sparkles className="w-3 h-3 mr-1" />}
-                       {data.studyDesign ? t.form.aiRefine : t.form.aiGenerate}
+                       {/* Changed label to clearly indicate Auto-Generation */}
+                       {language === 'es' ? "Auto-Redactar (Usando Selección)" : "Auto-Write (Using Dropdowns)"}
                      </button>
                 </div>
 

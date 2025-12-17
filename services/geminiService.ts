@@ -147,55 +147,54 @@ export interface GeneratedContentWithRefs {
 
 // Helper to separate text from references
 const extractReferences = (fullText: string): GeneratedContentWithRefs => {
-    // Delimiters
-    const splitters = [
-        '### REFERENCES ###',
-        '### References ###',
-        '### REFERENCIAS ###',
-        '### Bibliografía ###',
-        '**References**',
-        '**Referencias**',
-        '### BIBLIOGRAPHY ###'
+    // Delimiters to try
+    const explicitSplitters = [
+        '### REFERENCES ###', '### References ###', '### REFERENCIAS ###', '### Bibliografía ###',
+        '**References**', '**Referencias**', '### BIBLIOGRAPHY ###', 'References:', 'Referencias:', 'Bibliografía:'
     ];
 
-    for (const splitter of splitters) {
-        if (fullText.includes(splitter)) {
-            const parts = fullText.split(splitter);
-            // The last part is likely the references
-            if (parts.length > 1) {
-                // Join everything EXCEPT the last part as text
-                const references = parts.pop()?.trim() || "";
-                const text = parts.join("").trim(); 
-                return { text, references };
+    for (const splitter of explicitSplitters) {
+        // We use lastIndexOf in case the word references appears in the text naturally
+        const splitIndex = fullText.lastIndexOf(splitter);
+        if (splitIndex !== -1) {
+             const textPart = fullText.substring(0, splitIndex).trim();
+             const refsPart = fullText.substring(splitIndex + splitter.length).trim();
+             
+             // Sanity check: refsPart should look like a list
+             if (refsPart.length > 10 && /\d/.test(refsPart)) {
+                 return { text: textPart, references: refsPart };
+             }
+        }
+    }
+
+    // Fallback: Aggressive pattern matching for the end of the text
+    // Looks for a block at the end starting with "1. " or "[1]"
+    const lines = fullText.split('\n');
+    let refStartIndex = -1;
+
+    // Scan backwards
+    for (let i = lines.length - 1; i >= 0; i--) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // Check for reference pattern: "1. Author" or "[1] Author"
+        if (/^(\d+\.|\[\d+\])\s+/.test(line)) {
+            refStartIndex = i;
+        } else {
+            // If we hit a line that is NOT a reference and we found some refs, stop
+            if (refStartIndex !== -1) {
+                // Allow for multi-line refs: if this line is part of the previous ref?
+                // For simplicity, if we hit a clearly non-ref paragraph after finding refs, we assume refs started at refStartIndex
+                break;
             }
         }
     }
 
-    // Fallback: Try to find typical Vancouver patterns at the end
-    // Matches "1. Author..." or "[1] Author..." at the start of lines near the end
-    const lines = fullText.split('\n');
-    let splitIndex = -1;
-    
-    // Look backwards for a cluster of references
-    for (let i = lines.length - 1; i >= 0; i--) {
-        const line = lines[i].trim();
-        if (line === '') continue;
-        // Check if line looks like a reference start
-        if (/^(\d+\.|\[\d+\])\s+[A-Z]/.test(line)) {
-            splitIndex = i;
-        } else if (splitIndex !== -1 && i < splitIndex - 1) {
-            // If we found references but now encounter a non-reference line (and not just one previous line which might be continuation), stop
-            break;
-        }
-    }
-
-    if (splitIndex > 0) {
-        const text = lines.slice(0, splitIndex).join('\n').trim();
-        const references = lines.slice(splitIndex).join('\n').trim();
-        // Only return if references look substantial
-        if (references.length > 20) {
-             return { text, references };
-        }
+    if (refStartIndex !== -1) {
+        // Ensure we captured at least 2 lines or it looks very much like a bibliography
+        const potentialRefs = lines.slice(refStartIndex).join('\n').trim();
+        const textBody = lines.slice(0, refStartIndex).join('\n').trim();
+        return { text: textBody, references: potentialRefs };
     }
 
     return { text: fullText, references: "" };
