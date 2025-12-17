@@ -37,8 +37,8 @@ export const ProtocolPreview: React.FC<Props> = ({ data }) => {
   const handleEmail = () => {
       const subject = encodeURIComponent(`Synopsis: ${data.title.substring(0, 50)}...`);
       const bodyIntro = language === 'es' 
-        ? `Estimados,\n\nAdjunto encontrarán la Sinopsis Metodológica para el estudio titulado: "${data.title}".\n\nPor favor, revisen el documento adjunto (PDF/Word).\n\nSaludos cordiales,\n${data.sponsor || ''}`
-        : `Dear Team,\n\nPlease find attached the Methodological Synopsis for the study: "${data.title}".\n\nKindly review the attached document (PDF/Word).\n\nBest regards,\n${data.sponsor || ''}`;
+        ? `Estimados,\n\nAdjunto encontrarán la Sinopsis Metodológica para el estudio titulado: "${data.title}".\n\nPor favor, revisen el documento adjunto (PDF/Word) que he descargado de la aplicación.\n\nSaludos cordiales,\n${data.sponsor || ''}`
+        : `Dear Team,\n\nPlease find attached the Methodological Synopsis for the study: "${data.title}".\n\nKindly review the attached document (PDF/Word) I have downloaded.\n\nBest regards,\n${data.sponsor || ''}`;
       
       const body = encodeURIComponent(bodyIntro);
       window.location.href = `mailto:?subject=${subject}&body=${body}`;
@@ -65,11 +65,11 @@ export const ProtocolPreview: React.FC<Props> = ({ data }) => {
         <div className="bg-white border-b border-gray-200 p-2 flex flex-wrap justify-end gap-2 print:hidden items-center">
              
              {/* View Controls */}
-             <div className="flex items-center mr-4 bg-gray-50 rounded-md border border-gray-200">
+             <div className="flex items-center mr-auto md:mr-4 bg-gray-50 rounded-md border border-gray-200">
                 <button 
                     onClick={() => setFontSize(Math.max(8, fontSize - 1))}
                     className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-l-md transition-colors"
-                    title="Decrease Font Size"
+                    title={language === 'es' ? "Reducir tamaño letra" : "Decrease Font Size"}
                 >
                     <ZoomOut className="w-4 h-4" />
                 </button>
@@ -77,7 +77,7 @@ export const ProtocolPreview: React.FC<Props> = ({ data }) => {
                 <button 
                     onClick={() => setFontSize(Math.min(16, fontSize + 1))}
                     className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-r-md transition-colors"
-                    title="Increase Font Size"
+                    title={language === 'es' ? "Aumentar tamaño letra" : "Increase Font Size"}
                 >
                     <ZoomIn className="w-4 h-4" />
                 </button>
@@ -87,16 +87,16 @@ export const ProtocolPreview: React.FC<Props> = ({ data }) => {
              <button 
                 onClick={handleCopyText}
                 className="flex items-center text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md transition-colors"
-                title="Copy text to clipboard"
+                title={language === 'es' ? "Copiar texto al portapapeles" : "Copy text to clipboard"}
             >
                 {copied ? <Check className="w-4 h-4 mr-2 text-green-600" /> : <Copy className="w-4 h-4 mr-2" />}
-                {copied ? (language === 'es' ? 'Copiado' : 'Copied') : (language === 'es' ? 'Copiar Texto' : 'Copy Text')}
+                {copied ? (language === 'es' ? 'Copiado' : 'Copied') : (language === 'es' ? 'Copiar' : 'Copy')}
             </button>
 
              <button 
                 onClick={handleEmail}
                 className="flex items-center text-xs bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md transition-colors"
-                title="Send via Email client"
+                title={language === 'es' ? "Enviar por Email (abre su cliente de correo)" : "Send via Email client"}
             >
                 <Mail className="w-4 h-4 mr-2" />
                 Email
@@ -107,6 +107,7 @@ export const ProtocolPreview: React.FC<Props> = ({ data }) => {
              <button 
                 onClick={handleWordExport}
                 className="flex items-center text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded-md transition-colors border border-blue-200"
+                title={language === 'es' ? "Descargar .doc editable" : "Download editable .doc"}
             >
                 <FileDown className="w-4 h-4 mr-2" />
                 Word
@@ -115,6 +116,7 @@ export const ProtocolPreview: React.FC<Props> = ({ data }) => {
              <button 
                 onClick={handlePrint}
                 className="flex items-center text-xs bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-md transition-colors shadow-sm"
+                title={language === 'es' ? "Imprimir o Guardar como PDF" : "Print or Save as PDF"}
             >
                 <Printer className="w-4 h-4 mr-2" />
                 PDF / Print

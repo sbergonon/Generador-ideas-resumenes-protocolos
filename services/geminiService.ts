@@ -154,7 +154,8 @@ const extractReferences = (fullText: string): GeneratedContentWithRefs => {
         '### REFERENCIAS ###',
         '### Bibliografía ###',
         '**References**',
-        '**Referencias**'
+        '**Referencias**',
+        '### BIBLIOGRAPHY ###'
     ];
 
     for (const splitter of splitters) {
@@ -209,8 +210,8 @@ export const generateContextWithSearchAndRefs = async (title: string, objective:
   try {
     const model = 'gemini-2.5-flash'; 
     const langInstruction = lang === 'es' 
-      ? "Escribe en Español. Usa referencias numéricas en el texto [1], [2]. IMPORTANTE: Coloca TODAS las referencias completas ÚNICAMENTE al final del todo, separadas por '### REFERENCES ###'." 
-      : "Write in English. Use numeric citations in text [1], [2]. IMPORTANT: Place ALL full references ONLY at the very end, separated by '### REFERENCES ###'.";
+      ? "Escribe en Español. DEBES incluir citas numéricas [1], [2] en el texto y listar las referencias completas al final." 
+      : "Write in English. You MUST include numeric citations [1], [2] in the text and list full references at the end.";
 
     const prompt = `
       You are a clinical research expert performing a literature review.
@@ -223,9 +224,9 @@ export const generateContextWithSearchAndRefs = async (title: string, objective:
       1. Explain the disease/condition background.
       2. Explain the current gap in knowledge (Rationale).
       3. Use Google Search to find relevant, real medical literature.
-      4. Cite sources in text [1].
+      4. Cite sources in text using numbers [1], [2].
       5. ${langInstruction}
-      6. DO NOT include the list of references inside the main text. Only put them after the delimiter.
+      6. CRITICAL: Put the list of references at the very bottom, separated by '### REFERENCES ###'.
     `;
 
     const response = await ai.models.generateContent({
@@ -252,8 +253,8 @@ export const generateTextWithRefs = async (context: string, instruction: string,
   try {
     const model = 'gemini-2.5-flash';
     const langInstruction = lang === 'es' 
-      ? "Responde en Español. Cita con [1]. Pon la lista de bibliografía AL FINAL separada por '### REFERENCES ###'." 
-      : "Respond in English. Cite with [1]. Put the bibliography list AT THE END separated by '### REFERENCES ###'.";
+      ? "Responde en Español. INCLUYE citas bibliográficas ficticias o reales [1], [2] para dar rigor científico. Pon la lista de bibliografía AL FINAL separada por '### REFERENCES ###'." 
+      : "Respond in English. INCLUDE fictional or real citations [1], [2] to add scientific rigor. Put the bibliography list AT THE END separated by '### REFERENCES ###'.";
 
     const prompt = `
       Act as an expert clinical research methodologist.
@@ -264,7 +265,7 @@ export const generateTextWithRefs = async (context: string, instruction: string,
       ${context}
       
       Output Format:
-      [Main Text Body]
+      [Main Text Body with citations like [1]]
       
       ### REFERENCES ###
       [List of References in Vancouver Style]

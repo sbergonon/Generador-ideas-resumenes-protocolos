@@ -16,6 +16,24 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const handleChange = (field: keyof ProtocolData, value: any) => {
+    // Special logic for Statistics Calculation
+    if (field === 'totalSubjects' || field === 'numPhysicians') {
+        const total = field === 'totalSubjects' ? parseInt(value) : parseInt(data.totalSubjects);
+        const phys = field === 'numPhysicians' ? parseInt(value) : parseInt(data.numPhysicians);
+        
+        let newSubjectsPerPhys = data.subjectsPerPhysician;
+        if (!isNaN(total) && !isNaN(phys) && phys > 0) {
+            newSubjectsPerPhys = Math.ceil(total / phys).toString();
+        }
+
+        onChange({ 
+            ...data, 
+            [field]: value,
+            subjectsPerPhysician: newSubjectsPerPhys
+        });
+        return;
+    }
+
     onChange({ ...data, [field]: value });
   };
 
@@ -154,6 +172,27 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
     }
     setLoadingField(null);
   };
+  
+  const handleSuggestEvaluations = async (field: keyof ProtocolData) => {
+    setLoadingField(field);
+    const context = `
+        Title: ${data.title}
+        Primary Objective: ${data.primaryObjective}
+        Secondary Objectives: ${data.secondaryObjectives.join(', ')}
+        Scales: ${data.measurementScales.join(', ')}
+        Study Type: ${data.studyType}
+    `;
+    const instruction = field === 'evaluationsGeneral'
+        ? "Suggest a general schedule of assessments and evaluations suitable for this study design. Mention Screening, Baseline, and Follow-up visits."
+        : "Suggest specific methods, timings, and procedures to evaluate the PRIMARY variable/endpoint.";
+
+    // We use generateText because suggestions usually don't need citations yet, but can be edited
+    const result = await generateText(context, instruction, language);
+    if (result) {
+        handleChange(field, result);
+    }
+    setLoadingField(null);
+  };
 
   const handleContextSearch = async () => {
     setLoadingField('contextSummary');
@@ -244,10 +283,8 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
     return 0.842; // default 0.80
   };
 
-  const handleCalculateSampleSize = () => {
-    const params = data.statsParams || {};
-    
-    // 1. Parse Parameters
+  // Function to calculate sample size and return value (silent mode)
+  const calculateSampleTotal = (params: any): string | null => {
     let alpha = parseFloat(params.alpha);
     if (isNaN(alpha)) alpha = 0.05;
 
@@ -269,15 +306,11 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
        dropout = dropout / 100;
     }
 
-    // 2. Validation
     if (!effectSize || effectSize <= 0) {
-        alert(language === 'es' 
-            ? "Por favor ingrese un Tamaño del Efecto válido (ej. 0.5 para Cohen's d)." 
-            : "Please enter a valid Effect Size (e.g. 0.5 for Cohen's d).");
-        return;
+        return null;
     }
 
-    // 3. Calculation (Lehr's Formula / Two-sample t-test approx)
+    // Calculation (Lehr's Formula / Two-sample t-test approx)
     const zAlpha = getZScoreAlpha(alpha);
     const zBeta = getZScoreBeta(power);
 
@@ -285,24 +318,47 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
     const nPerGroup = 2 * Math.pow((zAlpha + zBeta) / effectSize, 2);
     let total = Math.ceil(nPerGroup * 2);
 
-    // 4. Adjust for Dropout
+    // Adjust for Dropout
     if (dropout > 0 && dropout < 1) {
         total = Math.ceil(total / (1 - dropout));
     }
 
-    // 5. Set Total Subjects FIRST
-    handleChange('totalSubjects', total.toString());
-    
-    // 6. Then distribute if sites are set
-    const nPhys = parseInt(data.numPhysicians);
-    if (!isNaN(nPhys) && nPhys > 0) {
-        const perSite = Math.ceil(total / nPhys);
-        handleChange('subjectsPerPhysician', perSite.toString());
+    return total.toString();
+  };
+
+  // Enhanced handler for Stats Parameters
+  const handleStatsParamChange = (param: string, value: string) => {
+      // 1. Update the local params
+      const newStatsParams = { ...data.statsParams, [param]: value };
+      let newData = { ...data, statsParams: newStatsParams };
+      
+      // 2. Try automatic calculation if method is 'power'
+      if (data.sampleSizeMethod === 'power') {
+          const total = calculateSampleTotal(newStatsParams);
+          if (total) {
+              // Update total
+              newData = { ...newData, totalSubjects: total };
+              
+              // Recalculate Subjects per Physician immediately
+              const phys = parseInt(data.numPhysicians);
+              if (!isNaN(phys) && phys > 0) {
+                  const perPhys = Math.ceil(parseInt(total) / phys).toString();
+                  newData = { ...newData, subjectsPerPhysician: perPhys };
+              }
+          }
+      }
+      onChange(newData);
+  };
+
+  // Button handler for manual calculation (shows alerts)
+  const handleCalculateSampleSize = () => {
+    const total = calculateSampleTotal(data.statsParams);
+    if (total) {
+        handleChange('totalSubjects', total);
     } else {
-        // If no sites defined, keep 0 or blank, don't overwrite blindly
-        if (data.subjectsPerPhysician) {
-             handleChange('subjectsPerPhysician', ''); 
-        }
+         alert(language === 'es' 
+            ? "Por favor ingrese un Tamaño del Efecto válido (ej. 0.5)." 
+            : "Please enter a valid Effect Size (e.g. 0.5).");
     }
   };
 
@@ -843,7 +899,8 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                      <button
                         onClick={() => {
                           const studyType = data.studyType || 'Observacional';
-                          const instruction = `Act as an expert medical writer. Write a formal, precise, and academic methodological description. Structure: 1. Design Classification. 2. Methodological Description. 3. Data Interpretation Implications. Use references [1] if needed.`;
+                          // STRICT INSTRUCTION to ignore previous text if generating fresh
+                          const instruction = `Act as an expert medical writer. Write a formal, precise, and academic methodological description. Structure: 1. Design Classification. 2. Methodological Description. 3. Data Interpretation Implications. SYSTEM INSTRUCTION: Strictly adhere to the Study Type: ${studyType} and Design Model: ${data.designModel}. Ignore any previous mentions of other designs. Use references [1] if needed.`;
                           const context = `Title: ${data.title}\nObj: ${data.primaryObjective}\nType: ${studyType}\nModel: ${data.designModel}\nControl: ${data.controlType}\nFollow-up: ${data.followUpDuration}`;
                           
                           handleAIGenerateTextWithRefs('studyDesign', context, instruction);
@@ -874,7 +931,14 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                         onChange={(e) => handleChange('evaluationsGeneral', e.target.value)}
                         className="block w-full rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm border p-2"
                     />
-                    {renderAIButton('evaluationsGeneral', data.evaluationsGeneral, 'General study evaluations')}
+                    <button
+                        onClick={() => handleSuggestEvaluations('evaluationsGeneral')}
+                        disabled={loadingField === 'evaluationsGeneral'}
+                        className="absolute right-2 bottom-2 bg-gray-50 text-gray-700 hover:bg-gray-100 px-3 py-1 rounded-md text-xs font-medium flex items-center transition-colors shadow-sm border border-gray-200"
+                    >
+                         {loadingField === 'evaluationsGeneral' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Bot className="w-3 h-3 mr-1" />}
+                        {t.form.aiSuggest}
+                    </button>
                 </div>
 
                 <div className="relative">
@@ -885,6 +949,14 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                         onChange={(e) => handleChange('evaluationsPrimary', e.target.value)}
                         className="block w-full rounded-md border-gray-300 shadow-sm focus:border-medical-500 focus:ring-medical-500 sm:text-sm border p-2"
                     />
+                     <button
+                        onClick={() => handleSuggestEvaluations('evaluationsPrimary')}
+                        disabled={loadingField === 'evaluationsPrimary'}
+                        className="absolute right-2 bottom-2 bg-gray-50 text-gray-700 hover:bg-gray-100 px-3 py-1 rounded-md text-xs font-medium flex items-center transition-colors shadow-sm border border-gray-200"
+                    >
+                         {loadingField === 'evaluationsPrimary' ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Bot className="w-3 h-3 mr-1" />}
+                        {t.form.aiSuggest}
+                    </button>
                 </div>
                 
                  <div>
@@ -982,7 +1054,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                                       min="0"
                                       max="1"
                                       value={data.statsParams?.alpha || ''} 
-                                      onChange={(e) => handleDeepChange('statsParams', 'alpha', e.target.value)} 
+                                      onChange={(e) => handleStatsParamChange('alpha', e.target.value)} 
                                       className="w-full rounded border-gray-300 text-sm p-1.5" 
                                     />
                                 </div>
@@ -994,13 +1066,13 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                                       min="0"
                                       max="1"
                                       value={data.statsParams?.power || ''} 
-                                      onChange={(e) => handleDeepChange('statsParams', 'power', e.target.value)} 
+                                      onChange={(e) => handleStatsParamChange('power', e.target.value)} 
                                       className="w-full rounded border-gray-300 text-sm p-1.5" 
                                     />
                                 </div>
                                 <div className="col-span-2">
                                     <label className="block text-xs text-gray-600 mb-1">{t.form.labels.effectSize}</label>
-                                    <input type="text" placeholder="e.g. Cohen's d = 0.5" value={data.statsParams?.deltaOrEffectSize || ''} onChange={(e) => handleDeepChange('statsParams', 'deltaOrEffectSize', e.target.value)} className="w-full rounded border-gray-300 text-sm p-1.5" />
+                                    <input type="text" placeholder="e.g. Cohen's d = 0.5" value={data.statsParams?.deltaOrEffectSize || ''} onChange={(e) => handleStatsParamChange('deltaOrEffectSize', e.target.value)} className="w-full rounded border-gray-300 text-sm p-1.5" />
                                 </div>
                                 <div className="col-span-2 mt-2">
                                     <button
@@ -1030,7 +1102,7 @@ export const ProtocolForm: React.FC<Props> = ({ data, onChange }) => {
                         )}
                          <div className="col-span-2">
                             <label className="block text-xs text-gray-600 mb-1">{t.form.labels.dropout}</label>
-                            <input type="text" value={data.statsParams?.dropoutRate || ''} onChange={(e) => handleDeepChange('statsParams', 'dropoutRate', e.target.value)} className="w-full rounded border-gray-300 text-sm p-1.5" />
+                            <input type="text" value={data.statsParams?.dropoutRate || ''} onChange={(e) => handleStatsParamChange('dropoutRate', e.target.value)} className="w-full rounded border-gray-300 text-sm p-1.5" />
                         </div>
                     </div>
 
