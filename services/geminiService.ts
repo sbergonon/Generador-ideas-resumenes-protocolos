@@ -123,6 +123,30 @@ export interface GeneratedContentWithRefs {
   references: string;
 }
 
+/**
+ * Normalizes and deduplicates a list of references.
+ */
+const deduplicateRefs = (refsText: string): string => {
+    if (!refsText) return "";
+    const lines = refsText.split('\n').filter(l => l.trim().length > 0);
+    const seen = new Set<string>();
+    const uniqueLines: string[] = [];
+
+    lines.forEach(line => {
+        // Strip leading numbers like "1." or "[1]" to compare the actual bibliographic content
+        const content = line.replace(/^(\[\d+\]|\d+\.)\s*/, '').trim().toLowerCase();
+        // Simple normalization: remove non-alphanumeric chars for comparison
+        const normalized = content.replace(/[^a-z0-9]/g, '');
+        
+        if (normalized.length > 10 && !seen.has(normalized)) {
+            seen.add(normalized);
+            uniqueLines.push(line.trim());
+        }
+    });
+
+    return uniqueLines.join('\n');
+};
+
 const extractReferences = (fullText: string): GeneratedContentWithRefs => {
     const explicitSplitters = [
         '### REFERENCES ###', '### References ###', '### REFERENCIAS ###', '### Bibliografía ###',
@@ -130,31 +154,45 @@ const extractReferences = (fullText: string): GeneratedContentWithRefs => {
         'REFERENCIAS BIBLIOGRÁFICAS', 'BIBLIOGRAPHY'
     ];
 
+    let lastIndex = -1;
+    let foundSplitterLength = 0;
+
     for (const splitter of explicitSplitters) {
-        const splitIndex = fullText.lastIndexOf(splitter);
-        if (splitIndex !== -1) {
-             const textPart = fullText.substring(0, splitIndex).trim();
-             const refsPart = fullText.substring(splitIndex + splitter.length).trim();
-             if (refsPart.length > 5) return { text: textPart, references: refsPart };
+        const index = fullText.lastIndexOf(splitter);
+        if (index > lastIndex) {
+            lastIndex = index;
+            foundSplitterLength = splitter.length;
         }
     }
 
+    if (lastIndex !== -1) {
+        const textPart = fullText.substring(0, lastIndex).trim();
+        const rawRefs = fullText.substring(lastIndex + foundSplitterLength).trim();
+        if (rawRefs.length > 5) {
+             return { text: textPart, references: deduplicateRefs(rawRefs) };
+        }
+    }
+
+    // Fallback: search for a sequence of numbered lines at the end of the response
     const lines = fullText.split('\n');
     let refStartIndex = -1;
+
     for (let i = lines.length - 1; i >= 0; i--) {
         const line = lines[i].trim();
         if (!line) continue;
+        // Detects "1. ", "[1] ", etc.
         if (/^(\d+\.|\[\d+\])\s+/.test(line)) {
             refStartIndex = i;
         } else if (refStartIndex !== -1) {
+            // Stop if we find a line that isn't a reference once we've found some
             break;
         }
     }
 
-    if (refStartIndex !== -1) {
-        const potentialRefs = lines.slice(refStartIndex).join('\n').trim();
-        const textBody = lines.slice(0, refStartIndex).join('\n').trim();
-        if (potentialRefs.length > 20) return { text: textBody, references: potentialRefs };
+    if (refStartIndex !== -1 && refStartIndex > lines.length * 0.3) {
+        const textPart = lines.slice(0, refStartIndex).join('\n').trim();
+        const rawRefs = lines.slice(refStartIndex).join('\n').trim();
+        return { text: textPart, references: deduplicateRefs(rawRefs) };
     }
 
     return { text: fullText, references: "" };
@@ -175,12 +213,12 @@ export const generateContextWithSearchAndRefs = async (title: string, objective:
       Study Title: ${title}
       Primary Objective: ${objective}
       Instructions:
-      1. Explain the disease/condition background.
-      2. Explain the current gap in knowledge.
-      3. Use real medical literature.
-      4. Cite sources in text using numbers [1], [2].
+      1. Explain the disease/condition background and rationale.
+      2. Use real medical literature found via search.
+      3. Cite sources in text using numbers [1], [2].
+      4. Reuse the same number if you cite the same source again. DO NOT create duplicate reference entries.
       5. ${langInstruction}
-      6. CRITICAL: Separate references at the bottom with '### REFERENCES ###'.
+      6. CRITICAL: Put the references at the very bottom, separated by '### REFERENCES ###'.
     `;
 
     const response = await ai.models.generateContent({
@@ -209,7 +247,16 @@ export const generateTextWithRefs = async (context: string, instruction: string,
       ${instruction}
       ${langInstruction}
       Study Info: ${context}
-      Format: [Body with [1]] ### REFERENCES ### [List in Vancouver]
+      
+      CRITICAL RULES:
+      1. Reuse the same citation number for repeated sources.
+      2. Do not list the same bibliographic entry twice in the reference list.
+      
+      Format:
+      [Main text with [1]]
+      
+      ### REFERENCES ###
+      [List of unique references in Vancouver style]
     `;
 
     const response = await ai.models.generateContent({
